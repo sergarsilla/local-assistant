@@ -103,7 +103,11 @@ class AssistantSession(context: Context) :
         // Start loading while the user is still typing or speaking.
         AssistantRuntime.engine.preload()
         voice.preload()
-        AssistantRuntime.tools.activityStarter = ::startAssistantActivity
+        // Sending the user to another app means getting out of their way.
+        AssistantRuntime.tools.activityStarter = { intent ->
+            startAssistantActivity(intent)
+            hide()
+        }
         if (AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
