@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Starts an activity through whoever is allowed to do it right now. */
+fun interface ActivityLauncher {
+    fun launch(intent: Intent)
+}
+
 /** An action the model proposed; it only runs when the user taps it. */
 data class PendingAction(val label: String, val intent: Intent)
 
@@ -28,15 +33,15 @@ class ActionQueue {
         _pending.value = null
     }
 
-    fun confirm(context: Context) {
+    fun confirm(launcher: ActivityLauncher) {
         val action = _pending.value ?: return
         _pending.value = null
-        context.startActivity(action.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        launcher.launch(action.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 
 /** Timers start straight away: they are trivially reversible and asking would only get in the way. */
-class TimerTool(private val context: Context, private val listener: ToolActivityListener) : AssistantTool {
+class TimerTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
     override val name = "set_timer"
 
     override fun describe() = """
@@ -58,11 +63,11 @@ class TimerTool(private val context: Context, private val listener: ToolActivity
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
             .apply { label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it) } }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(context, intent, "timer started")
+        return start(launcher, intent, "timer started")
     }
 }
 
-class AlarmTool(private val context: Context, private val listener: ToolActivityListener) : AssistantTool {
+class AlarmTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
     override val name = "set_alarm"
 
     override fun describe() = """
@@ -87,11 +92,15 @@ class AlarmTool(private val context: Context, private val listener: ToolActivity
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
             .apply { label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it) } }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(context, intent, "alarm set for %02d:%02d".format(hour, minute))
+        return start(launcher, intent, "alarm set for %02d:%02d".format(hour, minute))
     }
 }
 
-class OpenAppTool(private val context: Context, private val listener: ToolActivityListener) : AssistantTool {
+class OpenAppTool(
+    private val context: Context,
+    private val launcher: ActivityLauncher,
+    private val listener: ToolActivityListener,
+) : AssistantTool {
     override val name = "open_app"
 
     override fun describe() = """
@@ -123,7 +132,7 @@ class OpenAppTool(private val context: Context, private val listener: ToolActivi
                 .toString()
         val intent = packages.getLaunchIntentForPackage(match.first)
             ?: return JSONObject().put("error", "app cannot be opened").toString()
-        return start(context, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}")
+        return start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}")
     }
 
     /**
@@ -242,7 +251,11 @@ class SendMessageTool(
 }
 
 /** Navigation and places go to whichever maps app the phone has, Google's or not. */
-class MapsTool(private val context: Context, private val listener: ToolActivityListener) : AssistantTool {
+class MapsTool(
+    private val context: Context,
+    private val launcher: ActivityLauncher,
+    private val listener: ToolActivityListener,
+) : AssistantTool {
     override val name = "open_maps"
 
     override fun describe() = """
@@ -277,11 +290,11 @@ class MapsTool(private val context: Context, private val listener: ToolActivityL
             .map { Intent(Intent.ACTION_VIEW, it).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
             .firstOrNull { it.resolveActivity(context.packageManager) != null }
             ?: return JSONObject().put("error", "no maps app installed").toString()
-        return start(context, intent, if (navigate) "navigating to $destination" else "showing $destination")
+        return start(launcher, intent, if (navigate) "navigating to $destination" else "showing $destination")
     }
 }
 
-private fun start(context: Context, intent: Intent, done: String): String = runCatching {
-    context.startActivity(intent)
+private fun start(launcher: ActivityLauncher, intent: Intent, done: String): String = runCatching {
+    launcher.launch(intent)
     JSONObject().put("status", done).toString()
 }.getOrElse { JSONObject().put("error", it.message ?: "could not start the action").toString() }

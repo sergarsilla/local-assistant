@@ -19,6 +19,7 @@
 namespace {
 
 constexpr int kBatchSize = 512;
+constexpr int kParseEveryTokens = 8;
 
 enum GenerateStatus : jint {
     kOk = 0,
@@ -159,11 +160,15 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     const common_chat_params chatParams = common_chat_templates_apply(session->templates.get(), inputs);
     LOGI("Chat format: %s (%zu tools)", common_chat_format_name(chatParams.format), inputs.tools.size());
     common_chat_parser_params parserParams(chatParams);
+    // Tool-call formats come with a PEG grammar; without loading it the parser only sees text.
+    if (!chatParams.parser.empty()) parserParams.parser.load(chatParams.parser);
 
     llama_context *ctx = session->ctx;
     const llama_vocab *vocab = llama_model_get_vocab(session->model);
-    std::vector<llama_token> tokens =
-        common_tokenize(ctx, chatParams.prompt, /*add_special=*/true, /*parse_special=*/true);
+    // The template leaves the assistant's turn header out of the prompt; without it the model
+    // writes the header itself and the reply parser cannot find the tool calls.
+    const std::string prompt = chatParams.prompt + chatParams.generation_prompt;
+    std::vector<llama_token> tokens = common_tokenize(ctx, prompt, /*add_special=*/true, /*parse_special=*/true);
     if (tokens.size() + static_cast<size_t>(maxTokens) > llama_n_ctx(ctx)) return kContextOverflow;
 
     size_t reused = 0;
@@ -191,6 +196,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     const auto generateStart = Clock::now();
     std::string raw;
     std::string streamed;
+    long long parseUs = 0;
     int generated = 0;
     jint status = kOk;
     bool keepGoing = true;
@@ -201,12 +207,17 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
         ++generated;
 
         raw += common_token_to_piece(ctx, token, /*special=*/false);
-        // Parsing as we go keeps tool-call syntax out of what the user sees.
-        std::string content;
-        try {
-            content = common_chat_parse(raw, /*is_partial=*/true, parserParams).content;
-        } catch (const std::exception &) {
-            content = streamed;
+        // Parsing as we go keeps tool-call syntax out of what the user sees, but running the
+        // grammar over the whole reply on every token would cost more than generating it.
+        std::string content = streamed;
+        if (generated % kParseEveryTokens == 0) {
+            const auto parseStart = Clock::now();
+            try {
+                content = common_chat_parse(raw, /*is_partial=*/true, parserParams).content;
+            } catch (const std::exception &) {
+                content = streamed;
+            }
+            parseUs += std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - parseStart).count();
         }
         if (content.size() > streamed.size()) {
             const std::string delta = content.substr(streamed.size());
@@ -230,9 +241,11 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     }
     common_sampler_free(sampler);
 
+    LOGI("Raw reply (%d tokens, %lldms parsing): |%s|", generated, parseUs / 1000, raw.substr(0, 100).c_str());
     if (status == kOk) {
         try {
             const common_chat_msg reply = common_chat_parse(raw, /*is_partial=*/false, parserParams);
+            LOGI("Parsed: %zu tool calls, content '%s'", reply.tool_calls.size(), reply.content.substr(0, 60).c_str());
             for (const auto &call : reply.tool_calls) {
                 jstring name = env->NewStringUTF(call.name.c_str());
                 jstring arguments = env->NewStringUTF(call.arguments.c_str());

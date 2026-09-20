@@ -220,7 +220,7 @@ private fun PanelContent(
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(action.label, style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { AssistantRuntime.tools.actions.confirm(context) }) {
+                        FilledTonalButton(onClick = { AssistantRuntime.tools.confirmPendingAction() }) {
                             Text(stringResource(R.string.panel_action_confirm))
                         }
                         TextButton(onClick = { AssistantRuntime.tools.actions.clear() }) {

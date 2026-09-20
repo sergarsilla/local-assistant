@@ -103,6 +103,7 @@ class AssistantSession(context: Context) :
         // Start loading while the user is still typing or speaking.
         AssistantRuntime.engine.preload()
         voice.preload()
+        AssistantRuntime.tools.activityStarter = ::startAssistantActivity
         if (AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
@@ -111,6 +112,7 @@ class AssistantSession(context: Context) :
 
     override fun onHide() {
         super.onHide()
+        AssistantRuntime.tools.activityStarter = null
         screen.clear()
         chat.stop()
         voice.onHide()
