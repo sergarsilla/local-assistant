@@ -1,0 +1,21 @@
+Local Assistant
+Copyright 2026 Local Assistant contributors
+
+This product includes third-party software:
+
+- llama.cpp (MIT) — https://github.com/ggml-org/llama.cpp
+  Included as a git submodule under third_party/ and compiled into libllama_jni.so.
+
+- LiteRT-LM (Apache-2.0) — https://github.com/google-ai-edge/LiteRT-LM
+  Used through the com.google.ai.edge.litertlm Maven artifact.
+
+- sherpa-onnx (Apache-2.0) — https://github.com/k2-fsa/sherpa-onnx
+  Prebuilt native libraries under app/src/main/jniLibs and the Kotlin API files under
+  app/src/main/java/com/k2fsa/sherpa/onnx, copied unmodified from the upstream release.
+
+- Silero VAD (MIT) — https://github.com/snakers4/silero-vad
+  The voice activity detection model bundled as app/src/main/assets/silero_vad.onnx.
+
+Speech and language models are downloaded by the user at runtime and keep their own licences:
+NVIDIA Parakeet and Canary (CC-BY-4.0), Piper voices (MIT), Kokoro (Apache-2.0),
+Google Gemma (Gemma Terms of Use) and any other model the user chooses.
