@@ -3,9 +3,22 @@ package dev.localassistant.llm
 import dev.localassistant.tools.AssistantTool
 import kotlinx.coroutines.flow.Flow
 
-enum class Role(val wire: String) { SYSTEM("system"), USER("user"), ASSISTANT("assistant") }
+enum class Role(val wire: String) {
+    SYSTEM("system"),
+    USER("user"),
+    ASSISTANT("assistant"),
+    TOOL("tool"),
+}
 
-data class ChatMessage(val role: Role, val text: String)
+data class ToolCall(val name: String, val arguments: String)
+
+data class ChatMessage(
+    val role: Role,
+    val text: String,
+    val toolCalls: List<ToolCall> = emptyList(),
+    /** Set on [Role.TOOL] messages: the tool that produced this result. */
+    val toolName: String? = null,
+)
 
 data class GenerationStats(
     val promptTokens: Int,
@@ -19,6 +32,9 @@ data class GenerationStats(
 
 sealed interface GenerationEvent {
     data class Text(val chunk: String) : GenerationEvent
+
+    /** The model asked for a tool; the caller runs it and continues the conversation. */
+    data class ToolRequest(val call: ToolCall) : GenerationEvent
     data class Finished(val stats: GenerationStats?) : GenerationEvent
 }
 

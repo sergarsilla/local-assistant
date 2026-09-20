@@ -8,6 +8,7 @@
 
 #include "chat.h"
 #include "common.h"
+#include "json.h"
 #include "llama.h"
 #include "sampling.h"
 
@@ -23,6 +24,7 @@ enum GenerateStatus : jint {
     kOk = 0,
     kContextOverflow = 1,
     kDecodeFailed = 2,
+    kToolCalls = 3,
 };
 
 struct Session {
@@ -117,43 +119,51 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeFree(JNIEnv *, jclass, jlong ha
 }
 
 /**
- * Renders the chat with the model's own template, reuses the cached prefix, and streams complete
- * UTF-8 chunks to `callback.onBytes(byte[]): boolean` until EOG, `maxTokens`, or the callback
- * returns false. Fills `stats` with {promptTokens, reusedTokens, prefillMs, generatedTokens, generateMs,
- * sampleMs, decodeMs}.
+ * Renders the chat with the model's own template, reuses the cached prefix, and streams the
+ * reply's text to `callback.onBytes(byte[]): boolean` as it is produced. Tool calls, when the
+ * model makes them, are reported through `callback.onToolCall(String, String)` and the return
+ * value is `kToolCalls`. Fills `stats` with {promptTokens, reusedTokens, prefillMs,
+ * generatedTokens, generateMs}.
+ *
+ * `messagesJson` and `toolsJson` use the OpenAI-compatible shapes llama.cpp already understands.
  */
 extern "C" JNIEXPORT jint JNICALL
 Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, jlong handle,
-                                                          jobjectArray roles, jobjectArray contents,
+                                                          jstring jmessages, jstring jtools,
                                                           jfloat temperature, jint maxTokens,
                                                           jobject callback, jlongArray stats) {
     auto *session = reinterpret_cast<Session *>(handle);
-    jmethodID onBytes = env->GetMethodID(env->GetObjectClass(callback), "onBytes", "([B)Z");
+    jclass callbackClass = env->GetObjectClass(callback);
+    jmethodID onBytes = env->GetMethodID(callbackClass, "onBytes", "([B)Z");
+    jmethodID onToolCall = env->GetMethodID(callbackClass, "onToolCall",
+                                            "(Ljava/lang/String;Ljava/lang/String;)V");
 
     common_chat_templates_inputs inputs;
     inputs.use_jinja = true;
     inputs.add_generation_prompt = true;
     inputs.enable_thinking = false;
-    const jsize count = env->GetArrayLength(roles);
-    for (jsize i = 0; i < count; ++i) {
-        auto role = static_cast<jstring>(env->GetObjectArrayElement(roles, i));
-        auto content = static_cast<jstring>(env->GetObjectArrayElement(contents, i));
-        const char *r = env->GetStringUTFChars(role, nullptr);
-        const char *c = env->GetStringUTFChars(content, nullptr);
-        common_chat_msg msg;
-        msg.role = r;
-        msg.content = c;
-        inputs.messages.push_back(std::move(msg));
-        env->ReleaseStringUTFChars(role, r);
-        env->ReleaseStringUTFChars(content, c);
-        env->DeleteLocalRef(role);
-        env->DeleteLocalRef(content);
+    const char *messagesJson = env->GetStringUTFChars(jmessages, nullptr);
+    const char *toolsJson = env->GetStringUTFChars(jtools, nullptr);
+    try {
+        inputs.messages = common_chat_msgs_parse_oaicompat(common_json::parse(messagesJson));
+        inputs.tools = common_chat_tools_parse_oaicompat(common_json::parse(toolsJson));
+    } catch (const std::exception &e) {
+        LOGE("Could not read the conversation: %s", e.what());
+        env->ReleaseStringUTFChars(jmessages, messagesJson);
+        env->ReleaseStringUTFChars(jtools, toolsJson);
+        return kDecodeFailed;
     }
-    const std::string prompt = common_chat_templates_apply(session->templates.get(), inputs).prompt;
+    env->ReleaseStringUTFChars(jmessages, messagesJson);
+    env->ReleaseStringUTFChars(jtools, toolsJson);
+
+    const common_chat_params chatParams = common_chat_templates_apply(session->templates.get(), inputs);
+    LOGI("Chat format: %s (%zu tools)", common_chat_format_name(chatParams.format), inputs.tools.size());
+    common_chat_parser_params parserParams(chatParams);
 
     llama_context *ctx = session->ctx;
     const llama_vocab *vocab = llama_model_get_vocab(session->model);
-    std::vector<llama_token> tokens = common_tokenize(ctx, prompt, /*add_special=*/true, /*parse_special=*/true);
+    std::vector<llama_token> tokens =
+        common_tokenize(ctx, chatParams.prompt, /*add_special=*/true, /*parse_special=*/true);
     if (tokens.size() + static_cast<size_t>(maxTokens) > llama_n_ctx(ctx)) return kContextOverflow;
 
     size_t reused = 0;
@@ -179,36 +189,40 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     common_sampler *sampler = common_sampler_init(session->model, samplingParams);
 
     const auto generateStart = Clock::now();
-    std::string pending;
+    std::string raw;
+    std::string streamed;
     int generated = 0;
     jint status = kOk;
     bool keepGoing = true;
-    long long sampleUs = 0;
-    long long decodeUs = 0;
     while (keepGoing && generated < maxTokens) {
-        const auto sampleStart = Clock::now();
         llama_token token = common_sampler_sample(sampler, ctx, -1);
         common_sampler_accept(sampler, token, true);
-        sampleUs += std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - sampleStart).count();
         if (llama_vocab_is_eog(vocab, token)) break;
         ++generated;
 
-        pending += common_token_to_piece(ctx, token, /*special=*/false);
-        const size_t ready = completeUtf8Prefix(pending);
-        if (ready > 0) {
-            jbyteArray chunk = env->NewByteArray(static_cast<jsize>(ready));
-            env->SetByteArrayRegion(chunk, 0, static_cast<jsize>(ready),
-                                    reinterpret_cast<const jbyte *>(pending.data()));
-            keepGoing = env->CallBooleanMethod(callback, onBytes, chunk);
-            env->DeleteLocalRef(chunk);
-            pending.erase(0, ready);
+        raw += common_token_to_piece(ctx, token, /*special=*/false);
+        // Parsing as we go keeps tool-call syntax out of what the user sees.
+        std::string content;
+        try {
+            content = common_chat_parse(raw, /*is_partial=*/true, parserParams).content;
+        } catch (const std::exception &) {
+            content = streamed;
+        }
+        if (content.size() > streamed.size()) {
+            const std::string delta = content.substr(streamed.size());
+            const size_t ready = completeUtf8Prefix(delta);
+            if (ready > 0) {
+                jbyteArray chunk = env->NewByteArray(static_cast<jsize>(ready));
+                env->SetByteArrayRegion(chunk, 0, static_cast<jsize>(ready),
+                                        reinterpret_cast<const jbyte *>(delta.data()));
+                keepGoing = env->CallBooleanMethod(callback, onBytes, chunk);
+                env->DeleteLocalRef(chunk);
+                streamed += delta.substr(0, ready);
+            }
         }
 
         std::vector<llama_token> next = {token};
-        const auto decodeStart = Clock::now();
-        const bool decoded = decodeTokens(ctx, next, 0);
-        decodeUs += std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - decodeStart).count();
-        if (!decoded) {
+        if (!decodeTokens(ctx, next, 0)) {
             status = kDecodeFailed;
             break;
         }
@@ -216,8 +230,24 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     }
     common_sampler_free(sampler);
 
-    jlong values[7] = {static_cast<jlong>(tokens.size()), static_cast<jlong>(reused), prefillMs, generated,
-                       elapsedMs(generateStart), sampleUs / 1000, decodeUs / 1000};
-    env->SetLongArrayRegion(stats, 0, 7, values);
+    if (status == kOk) {
+        try {
+            const common_chat_msg reply = common_chat_parse(raw, /*is_partial=*/false, parserParams);
+            for (const auto &call : reply.tool_calls) {
+                jstring name = env->NewStringUTF(call.name.c_str());
+                jstring arguments = env->NewStringUTF(call.arguments.c_str());
+                env->CallVoidMethod(callback, onToolCall, name, arguments);
+                env->DeleteLocalRef(name);
+                env->DeleteLocalRef(arguments);
+                status = kToolCalls;
+            }
+        } catch (const std::exception &e) {
+            LOGE("Could not read the reply: %s", e.what());
+        }
+    }
+
+    jlong values[5] = {static_cast<jlong>(tokens.size()), static_cast<jlong>(reused), prefillMs, generated,
+                       elapsedMs(generateStart)};
+    env->SetLongArrayRegion(stats, 0, 5, values);
     return status;
 }

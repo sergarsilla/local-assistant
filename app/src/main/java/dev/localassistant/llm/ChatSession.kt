@@ -3,6 +3,7 @@ package dev.localassistant.llm
 import android.util.Log
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.ToolRegistry
+import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.CoroutineScope
@@ -102,26 +103,57 @@ class ChatSession(
         while (true) {
             val window = listOf(systemMessage()) + history.drop(skip)
             try {
-                val available = if (engine.supportsTools) tools?.available().orEmpty() else emptyList()
-                engine.generate(window, available).collect { event ->
-                    when (event) {
-                        is GenerationEvent.Text -> {
-                            appendToReply(event.chunk)
-                            listener?.onChunk(event.chunk)
-                        }
-                        is GenerationEvent.Finished -> event.stats?.let {
-                            Log.i(TAG, "Reply: prompt=${it.promptTokens} tok, prefill=${it.prefillMillis}ms, " +
-                                "generated=${it.generatedTokens} tok in ${it.generateMillis}ms (%.1f tok/s)".format(it.tokensPerSecond))
-                            holder.recordSpeed(it)
-                        }
-                    }
-                }
+                runWithTools(engine, window, listener)
                 return
             } catch (e: ContextOverflowException) {
                 if (history.size - skip <= 1) throw e
                 skip += 2
             }
         }
+    }
+
+    /**
+     * Engines that report tool calls instead of running them get the results appended to the
+     * conversation and are asked again, until they answer with text or the budget runs out.
+     */
+    private suspend fun runWithTools(engine: LlmEngine, window: List<ChatMessage>, listener: ReplyListener?) {
+        val available = if (engine.supportsTools) tools?.available().orEmpty() else emptyList()
+        var conversation = window
+        repeat(MAX_TOOL_ROUNDS) {
+            val requested = mutableListOf<ToolCall>()
+            var replyText = ""
+            engine.generate(conversation, available).collect { event ->
+                when (event) {
+                    is GenerationEvent.Text -> {
+                        replyText += event.chunk
+                        appendToReply(event.chunk)
+                        listener?.onChunk(event.chunk)
+                    }
+                    is GenerationEvent.ToolRequest -> requested += event.call
+                    is GenerationEvent.Finished -> event.stats?.let {
+                        Log.i(
+                            TAG,
+                            "Reply: prompt=${it.promptTokens} tok, prefill=${it.prefillMillis}ms, " +
+                                "generated=${it.generatedTokens} tok in ${it.generateMillis}ms " +
+                                "(%.1f tok/s)".format(it.tokensPerSecond),
+                        )
+                        holder.recordSpeed(it)
+                    }
+                }
+            }
+            if (requested.isEmpty()) return
+
+            val results = requested.map { call ->
+                val tool = available.firstOrNull { it.name == call.name }
+                val output = tool?.let { runCatching { it.run(JSONObject(call.arguments)) }.getOrElse { error -> 
+                    JSONObject().put("error", error.message ?: "tool failed").toString()
+                } } ?: JSONObject().put("error", "unknown tool").toString()
+                Log.i(TAG, "Tool ${call.name} -> ${output.take(120)}")
+                ChatMessage(Role.TOOL, output, toolName = call.name)
+            }
+            conversation = conversation + ChatMessage(Role.ASSISTANT, replyText, toolCalls = requested) + results
+        }
+        Log.w(TAG, "Gave up after $MAX_TOOL_ROUNDS tool rounds")
     }
 
     private fun appendToReply(chunk: String) = _messages.update { list ->
@@ -135,6 +167,7 @@ class ChatSession(
 
     private companion object {
         const val TAG = "ChatSession"
+        const val MAX_TOOL_ROUNDS = 4
     }
 
     private fun systemMessage() = ChatMessage(
