@@ -12,3 +12,7 @@ captures/
 *.litertlm
 *.onnx
 .env
+
+# Personal project brief, not part of the published app
+AGENT_PROMPT.md
+PROJECT_SPEC.md
