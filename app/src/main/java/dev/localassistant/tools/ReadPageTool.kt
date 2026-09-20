@@ -10,9 +10,9 @@ class ReadPageTool(private val listener: ToolActivityListener) : AssistantTool {
 
     override fun describe() = """
         {"name":"read_web_page",
-         "description":"Read the main text of a web page found with web_search, when the snippets are not enough.",
+         "description":"Read a page found with web_search when its snippet is not enough.",
          "parameters":{"type":"object","properties":{
-           "url":{"type":"string","description":"Full https URL of the page."}},
+           "url":{"type":"string"}},
           "required":["url"]}}
     """.trimIndent()
 

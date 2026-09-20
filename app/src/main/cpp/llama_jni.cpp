@@ -85,6 +85,9 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeLoad(JNIEnv *env, jclass, jstri
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
     llama_model_params modelParams = llama_model_default_params();
+    // Mapping the file makes loading look instant but then the first reply pays for reading every
+    // weight from storage; loading it outright keeps the first answer as quick as the next ones.
+    modelParams.load_mode = LLAMA_LOAD_MODE_NONE;
     llama_model *model = llama_model_load_from_file(path, modelParams);
     env->ReleaseStringUTFChars(jpath, path);
     if (model == nullptr) return 0;
@@ -143,6 +146,8 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     inputs.use_jinja = true;
     inputs.add_generation_prompt = true;
     inputs.enable_thinking = false;
+    // Thinking models still emit their <think> block; this keeps it out of the visible answer.
+    inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
     const char *messagesJson = env->GetStringUTFChars(jmessages, nullptr);
     const char *toolsJson = env->GetStringUTFChars(jtools, nullptr);
     try {
@@ -162,6 +167,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     common_chat_parser_params parserParams(chatParams);
     // Tool-call formats come with a PEG grammar; without loading it the parser only sees text.
     if (!chatParams.parser.empty()) parserParams.parser.load(chatParams.parser);
+    parserParams.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
 
     llama_context *ctx = session->ctx;
     const llama_vocab *vocab = llama_model_get_vocab(session->model);

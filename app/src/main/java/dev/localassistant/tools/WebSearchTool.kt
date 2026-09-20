@@ -16,9 +16,9 @@ class WebSearchTool(private val listener: ToolActivityListener) : AssistantTool 
 
     override fun describe() = """
         {"name":"web_search",
-         "description":"Search the web for current information the model cannot know, such as news, prices, schedules or recent facts. Returns short result snippets.",
+         "description":"Search the web for current facts you cannot know. Returns short snippets.",
          "parameters":{"type":"object","properties":{
-           "query":{"type":"string","description":"What to search for, in the user's language."}},
+           "query":{"type":"string","description":"In the user's language."}},
           "required":["query"]}}
     """.trimIndent()
 

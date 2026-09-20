@@ -46,10 +46,10 @@ class TimerTool(private val launcher: ActivityLauncher, private val listener: To
 
     override fun describe() = """
         {"name":"set_timer",
-         "description":"Start a countdown timer on the phone's clock app.",
+         "description":"Start a countdown timer.",
          "parameters":{"type":"object","properties":{
-           "seconds":{"type":"integer","description":"Length of the timer in seconds."},
-           "label":{"type":"string","description":"What the timer is for."}},
+           "seconds":{"type":"integer"},
+           "label":{"type":"string"}},
           "required":["seconds"]}}
     """.trimIndent()
 
@@ -72,11 +72,11 @@ class AlarmTool(private val launcher: ActivityLauncher, private val listener: To
 
     override fun describe() = """
         {"name":"set_alarm",
-         "description":"Set an alarm at a given time of day on the phone's clock app.",
+         "description":"Set an alarm at a time of day.",
          "parameters":{"type":"object","properties":{
-           "hour":{"type":"integer","description":"Hour in 24h format, 0-23."},
-           "minute":{"type":"integer","description":"Minute, 0-59."},
-           "label":{"type":"string","description":"What the alarm is for."}},
+           "hour":{"type":"integer","description":"0-23"},
+           "minute":{"type":"integer","description":"0-59"},
+           "label":{"type":"string"}},
           "required":["hour","minute"]}}
     """.trimIndent()
 
@@ -105,9 +105,9 @@ class OpenAppTool(
 
     override fun describe() = """
         {"name":"open_app",
-         "description":"Open an installed app by name.",
+         "description":"Open an installed app.",
          "parameters":{"type":"object","properties":{
-           "name":{"type":"string","description":"App name as the user says it, e.g. 'camera' or 'Signal'."}},
+           "name":{"type":"string","description":"App name."}},
           "required":["name"]}}
     """.trimIndent()
 
@@ -181,12 +181,12 @@ class CalendarTool(
 
     override fun describe() = """
         {"name":"create_calendar_event",
-         "description":"Prepare a calendar event. The user confirms it before it is created.",
+         "description":"Prepare a calendar event for the user to confirm.",
          "parameters":{"type":"object","properties":{
            "title":{"type":"string"},
-           "date":{"type":"string","description":"Date as YYYY-MM-DD."},
-           "time":{"type":"string","description":"Start time as HH:MM in 24h format."},
-           "duration_minutes":{"type":"integer","description":"Length in minutes, default 60."}},
+           "date":{"type":"string","description":"YYYY-MM-DD"},
+           "time":{"type":"string","description":"HH:MM"},
+           "duration_minutes":{"type":"integer","description":"default 60"}},
           "required":["title","date","time"]}}
     """.trimIndent()
 
@@ -228,10 +228,10 @@ class SendMessageTool(
 
     override fun describe() = """
         {"name":"send_message",
-         "description":"Prepare a text message. The user confirms it and sends it from their messaging app.",
+         "description":"Prepare a text message for the user to confirm.",
          "parameters":{"type":"object","properties":{
-           "recipient":{"type":"string","description":"Phone number or contact name."},
-           "text":{"type":"string","description":"Message body."}},
+           "recipient":{"type":"string"},
+           "text":{"type":"string"}},
           "required":["recipient","text"]}}
     """.trimIndent()
 
@@ -260,11 +260,11 @@ class MapsTool(
 
     override fun describe() = """
         {"name":"open_maps",
-         "description":"Show a place on the map or start turn-by-turn navigation to it in the phone's maps app.",
+         "description":"Show a place on the map or navigate to it.",
          "parameters":{"type":"object","properties":{
-           "destination":{"type":"string","description":"Address, place name or 'latitude,longitude'."},
-           "navigate":{"type":"boolean","description":"True to start navigation, false to just show it. Default true."},
-           "mode":{"type":"string","description":"driving, walking, bicycling or transit. Default driving."}},
+           "destination":{"type":"string"},
+           "navigate":{"type":"boolean","description":"default true"},
+           "mode":{"type":"string","description":"driving|walking|bicycling|transit"}},
           "required":["destination"]}}
     """.trimIndent()
 
