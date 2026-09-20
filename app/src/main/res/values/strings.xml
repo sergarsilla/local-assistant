@@ -1,0 +1,117 @@
+<resources>
+    <string name="app_name">Local Assistant</string>
+
+    <string name="tab_history">Chats</string>
+    <string name="history_title">Conversations</string>
+    <string name="history_empty">Nothing here yet. What you ask the assistant is saved on this phone.</string>
+    <string name="history_messages">%1$d messages</string>
+    <string name="history_delete_all">Delete all</string>
+    <string name="history_delete_all_confirm">Delete every conversation? They are wiped from the database, not just hidden.</string>
+    <string name="history_note">Conversations never leave the phone. Deleting one overwrites its rows and rewrites the database file.</string>
+    <string name="history_back">Back</string>
+    <string name="tab_models">Models</string>
+    <string name="tab_setup">Setup</string>
+
+    <string name="setup_title">Set up the assistant</string>
+    <string name="setup_body">Choose Local Assistant as the digital assistant app, then use your assistant gesture (corner swipe, power button…) to open it over any app.</string>
+    <string name="setup_open_settings">Open default apps settings</string>
+    <string name="setup_status_active">Local Assistant is the current assistant.</string>
+    <string name="setup_status_inactive">Local Assistant is not the current assistant yet.</string>
+
+    <string name="panel_hint">Ask something…</string>
+    <string name="panel_send">Send</string>
+    <string name="panel_stop">Stop</string>
+    <string name="panel_greeting">Hi! How can I help?</string>
+    <string name="panel_loading_model">Loading %1$s…</string>
+    <string name="panel_model_ready">%1$s</string>
+    <string name="panel_no_model">No model installed yet.</string>
+    <string name="panel_open_models">Choose a model</string>
+    <string name="panel_error">Something went wrong: %1$s</string>
+
+    <string name="panel_tool_web_search">Searching the web: %1$s</string>
+    <string name="panel_tool_read_web_page">Reading %1$s</string>
+    <string name="panel_tool_generic">%1$s: %2$s</string>
+    <string name="panel_action_confirm">Confirm</string>
+    <string name="panel_action_discard">Discard</string>
+    <string name="panel_no_tools">This model cannot use actions or web search. Pick a LiteRT-LM model for that.</string>
+
+    <string name="panel_use_screen">Screen</string>
+    <string name="panel_screen_off">Screen text is off. Turn on "Use text from screen" in the assistant settings.</string>
+    <string name="panel_conversation">Conversation</string>
+    <string name="panel_conversation_on">Conversation mode: speak whenever you want; tap to interrupt the reply.</string>
+    <string name="panel_listen">Speak</string>
+    <string name="panel_stop_listening">Stop listening</string>
+    <string name="panel_listening">Listening…</string>
+    <string name="panel_hearing">I can hear you…</string>
+    <string name="panel_transcribing">Transcribing…</string>
+    <string name="panel_speaking">Speaking. Tap anywhere to stop.</string>
+    <string name="panel_stop_speaking">Stop speaking</string>
+    <string name="panel_needs_mic">The microphone permission is off.</string>
+    <string name="panel_needs_voice_model">No speech model installed.</string>
+    <string name="panel_open_voice_setup">Voice setup</string>
+
+    <string name="voice_title">Voice</string>
+    <string name="voice_mic_permission">Allow the microphone</string>
+    <string name="voice_mic_granted">Microphone allowed.</string>
+    <string name="voice_listen_on_open">Listen as soon as the assistant opens</string>
+    <string name="voice_speak_replies">Speak the reply when I ask out loud</string>
+    <string name="voice_language">Speech language</string>
+    <string name="voice_packs">Speech models</string>
+    <string name="voice_pack_stt_canary">Recognition · Canary 180M — light, needs the language set</string>
+    <string name="voice_pack_stt_parakeet">Recognition · Parakeet 0.6B — more accurate, detects the language, uses ~1 GB</string>
+    <string name="voice_voices_es">Spanish voices</string>
+    <string name="voice_voices_en">English voices</string>
+    <string name="voice_pack_es_davefx">Piper davefx (Spain, male)</string>
+    <string name="voice_pack_es_miro">Piper miro (Spain, male, high quality)</string>
+    <string name="voice_pack_es_sharvard">Piper sharvard (Spain, female)</string>
+    <string name="voice_pack_mx_claude">Piper claude (Mexico, male, high quality)</string>
+    <string name="voice_pack_ar_daniela">Piper daniela (Argentina, female, high quality)</string>
+    <string name="voice_pack_kokoro">Kokoro (most natural, slower)</string>
+    <string name="voice_pack_en_lessac">Piper lessac (US, female)</string>
+    <string name="voice_pack_use">Use</string>
+    <string name="voice_pack_in_use">In use</string>
+
+    <string name="models_installed">Installed</string>
+    <string name="models_none_installed">No models yet. Download a recommended one or import a file.</string>
+    <string name="models_active">Active</string>
+    <string name="models_use">Use</string>
+    <string name="models_delete">Delete</string>
+    <string name="models_delete_confirm">Delete %1$s? This frees %2$s.</string>
+    <string name="models_speed">%1$.1f tok/s</string>
+    <string name="models_speed_unknown">speed not measured yet</string>
+    <string name="models_recommended">Recommended</string>
+    <string name="models_download">Download</string>
+    <string name="models_installed_badge">Installed</string>
+    <string name="models_transfers">In progress</string>
+    <string name="models_transfer_failed">Failed: %1$s</string>
+    <string name="models_retry">Retry</string>
+    <string name="models_dismiss">Dismiss</string>
+    <string name="models_search_title">Search Hugging Face</string>
+    <string name="models_search_hint">e.g. qwen3, llama 3.2, phi-4</string>
+    <string name="models_search">Search</string>
+    <string name="models_search_failed">Search failed: %1$s</string>
+    <string name="models_no_files">No compatible single-file models in this repository.</string>
+    <string name="models_import">Import a file</string>
+    <string name="models_import_unsupported">Unsupported file: %1$s. Use .gguf or .litertlm.</string>
+    <string name="models_network_note">Downloads come straight from huggingface.co. Nothing else uses the network.</string>
+    <string name="models_format_gguf">GGUF · llama.cpp</string>
+    <string name="models_format_litert">LiteRT-LM</string>
+
+    <string name="catalog_note_gemma_e2b_litert">Default. Fast and good in Spanish and English (~19 tok/s on a Pixel 10).</string>
+    <string name="catalog_note_gemma_e4b_litert">Smarter, slower. Needs more RAM.</string>
+    <string name="catalog_note_gemma_e2b_gguf">Same model as GGUF, for comparison with llama.cpp.</string>
+    <string name="catalog_note_qwen3_4b">Strong reasoning, good multilingual support.</string>
+
+    <string name="models_network_off">Network access is off for this app, so it cannot search or download models. Turn on the Network permission if you want downloads; everything else works offline.</string>
+    <string name="models_network_open_settings">Open app permissions</string>
+    <string name="models_panel_ram_note">The assistant panel has about 3 GB of memory; bigger models may run slower there.</string>
+
+    <string name="setup_screen_on">Screen text is on: the assistant can read what is on screen when you ask it to.</string>
+    <string name="setup_screen_off">Screen text is off. Turn on "Use text from screen" in the digital assistant settings to let it read your screen when you ask.</string>
+    <string name="setup_language">Language</string>
+    <string name="setup_language_system">System default</string>
+
+    <string name="download_channel">Model downloads</string>
+    <string name="download_notification_title">Downloading %1$s</string>
+    <string name="action_cancel">Cancel</string>
+</resources>

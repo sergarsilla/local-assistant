@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.LocalAssistant" parent="android:Theme.Material.NoActionBar" />
+</resources>

@@ -1,0 +1,117 @@
+<resources>
+    <string name="app_name">Asistente local</string>
+
+    <string name="tab_history">Chats</string>
+    <string name="history_title">Conversaciones</string>
+    <string name="history_empty">Aún no hay nada. Lo que le preguntes al asistente se guarda en este móvil.</string>
+    <string name="history_messages">%1$d mensajes</string>
+    <string name="history_delete_all">Borrar todas</string>
+    <string name="history_delete_all_confirm">¿Borrar todas las conversaciones? Se eliminan de la base de datos, no solo se ocultan.</string>
+    <string name="history_note">Las conversaciones no salen del móvil. Al borrar una se sobrescriben sus filas y se reescribe el archivo de la base de datos.</string>
+    <string name="history_back">Volver</string>
+    <string name="tab_models">Modelos</string>
+    <string name="tab_setup">Configuración</string>
+
+    <string name="setup_title">Configura el asistente</string>
+    <string name="setup_body">Elige Asistente local como app de asistente digital y usa tu gesto de asistente (deslizar desde la esquina, botón de encendido…) para abrirlo encima de cualquier app.</string>
+    <string name="setup_open_settings">Abrir apps predeterminadas</string>
+    <string name="setup_status_active">Asistente local es el asistente actual.</string>
+    <string name="setup_status_inactive">Asistente local todavía no es el asistente actual.</string>
+
+    <string name="panel_hint">Pregunta algo…</string>
+    <string name="panel_send">Enviar</string>
+    <string name="panel_stop">Parar</string>
+    <string name="panel_greeting">¡Hola! ¿En qué te ayudo?</string>
+    <string name="panel_loading_model">Cargando %1$s…</string>
+    <string name="panel_model_ready">%1$s</string>
+    <string name="panel_no_model">Aún no hay ningún modelo instalado.</string>
+    <string name="panel_open_models">Elegir un modelo</string>
+    <string name="panel_error">Algo ha fallado: %1$s</string>
+
+    <string name="panel_tool_web_search">Buscando en internet: %1$s</string>
+    <string name="panel_tool_read_web_page">Leyendo %1$s</string>
+    <string name="panel_tool_generic">%1$s: %2$s</string>
+    <string name="panel_action_confirm">Confirmar</string>
+    <string name="panel_action_discard">Descartar</string>
+    <string name="panel_no_tools">Este modelo no puede usar acciones ni buscar en internet. Elige un modelo LiteRT-LM para eso.</string>
+
+    <string name="panel_use_screen">Pantalla</string>
+    <string name="panel_screen_off">El texto de pantalla está desactivado. Actívalo en los ajustes del asistente.</string>
+    <string name="panel_conversation">Conversación</string>
+    <string name="panel_conversation_on">Modo conversación: habla cuando quieras; toca para interrumpir la respuesta.</string>
+    <string name="panel_listen">Hablar</string>
+    <string name="panel_stop_listening">Dejar de escuchar</string>
+    <string name="panel_listening">Escuchando…</string>
+    <string name="panel_hearing">Te oigo…</string>
+    <string name="panel_transcribing">Transcribiendo…</string>
+    <string name="panel_speaking">Hablando. Toca para parar.</string>
+    <string name="panel_stop_speaking">Dejar de hablar</string>
+    <string name="panel_needs_mic">El permiso de micrófono está desactivado.</string>
+    <string name="panel_needs_voice_model">No hay ningún modelo de voz instalado.</string>
+    <string name="panel_open_voice_setup">Configurar voz</string>
+
+    <string name="voice_title">Voz</string>
+    <string name="voice_mic_permission">Permitir el micrófono</string>
+    <string name="voice_mic_granted">Micrófono permitido.</string>
+    <string name="voice_listen_on_open">Escuchar nada más abrir el asistente</string>
+    <string name="voice_speak_replies">Responder en voz alta cuando pregunte hablando</string>
+    <string name="voice_language">Idioma del habla</string>
+    <string name="voice_packs">Modelos de voz</string>
+    <string name="voice_pack_stt_canary">Reconocimiento · Canary 180M: ligero, hay que decirle el idioma</string>
+    <string name="voice_pack_stt_parakeet">Reconocimiento · Parakeet 0.6B: más preciso, detecta el idioma, ocupa ~1 GB</string>
+    <string name="voice_voices_es">Voces en español</string>
+    <string name="voice_voices_en">Voces en inglés</string>
+    <string name="voice_pack_es_davefx">Piper davefx (España, hombre)</string>
+    <string name="voice_pack_es_miro">Piper miro (España, hombre, alta calidad)</string>
+    <string name="voice_pack_es_sharvard">Piper sharvard (España, mujer)</string>
+    <string name="voice_pack_mx_claude">Piper claude (México, hombre, alta calidad)</string>
+    <string name="voice_pack_ar_daniela">Piper daniela (Argentina, mujer, alta calidad)</string>
+    <string name="voice_pack_kokoro">Kokoro (la más natural, más lenta)</string>
+    <string name="voice_pack_en_lessac">Piper lessac (EE. UU., mujer)</string>
+    <string name="voice_pack_use">Usar</string>
+    <string name="voice_pack_in_use">En uso</string>
+
+    <string name="models_installed">Instalados</string>
+    <string name="models_none_installed">Aún no hay modelos. Descarga uno recomendado o importa un archivo.</string>
+    <string name="models_active">Activo</string>
+    <string name="models_use">Usar</string>
+    <string name="models_delete">Borrar</string>
+    <string name="models_delete_confirm">¿Borrar %1$s? Libera %2$s.</string>
+    <string name="models_speed">%1$.1f tok/s</string>
+    <string name="models_speed_unknown">velocidad aún sin medir</string>
+    <string name="models_recommended">Recomendados</string>
+    <string name="models_download">Descargar</string>
+    <string name="models_installed_badge">Instalado</string>
+    <string name="models_transfers">En curso</string>
+    <string name="models_transfer_failed">Error: %1$s</string>
+    <string name="models_retry">Reintentar</string>
+    <string name="models_dismiss">Descartar</string>
+    <string name="models_search_title">Buscar en Hugging Face</string>
+    <string name="models_search_hint">p. ej. qwen3, llama 3.2, phi-4</string>
+    <string name="models_search">Buscar</string>
+    <string name="models_search_failed">La búsqueda ha fallado: %1$s</string>
+    <string name="models_no_files">Este repositorio no tiene modelos compatibles en un solo archivo.</string>
+    <string name="models_import">Importar un archivo</string>
+    <string name="models_import_unsupported">Archivo no compatible: %1$s. Usa .gguf o .litertlm.</string>
+    <string name="models_network_note">Las descargas vienen directamente de huggingface.co. Nada más usa la red.</string>
+    <string name="models_format_gguf">GGUF · llama.cpp</string>
+    <string name="models_format_litert">LiteRT-LM</string>
+
+    <string name="catalog_note_gemma_e2b_litert">Por defecto. Rápido y bueno en español e inglés (~19 tok/s en un Pixel 10).</string>
+    <string name="catalog_note_gemma_e4b_litert">Más listo y más lento. Necesita más RAM.</string>
+    <string name="catalog_note_gemma_e2b_gguf">El mismo modelo en GGUF, para comparar con llama.cpp.</string>
+    <string name="catalog_note_qwen3_4b">Razona bien y es bueno en varios idiomas.</string>
+
+    <string name="models_network_off">El acceso a la red está desactivado para esta app, así que no puede buscar ni descargar modelos. Activa el permiso de Red si quieres descargas; todo lo demás funciona sin conexión.</string>
+    <string name="models_network_open_settings">Abrir permisos de la app</string>
+    <string name="models_panel_ram_note">El panel del asistente dispone de unos 3 GB de memoria; los modelos más grandes pueden ir más lentos ahí.</string>
+
+    <string name="setup_screen_on">Texto de pantalla activado: el asistente puede leer lo que hay en pantalla cuando se lo pidas.</string>
+    <string name="setup_screen_off">Texto de pantalla desactivado. Actívalo en los ajustes de la app de asistente digital para que pueda leer tu pantalla cuando se lo pidas.</string>
+    <string name="setup_language">Idioma</string>
+    <string name="setup_language_system">Idioma del sistema</string>
+
+    <string name="download_channel">Descargas de modelos</string>
+    <string name="download_notification_title">Descargando %1$s</string>
+    <string name="action_cancel">Cancelar</string>
+</resources>
