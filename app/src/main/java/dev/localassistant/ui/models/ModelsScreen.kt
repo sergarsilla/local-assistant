@@ -121,7 +121,7 @@ fun ModelsScreen(state: ModelsUiState, actions: ModelsActions, modifier: Modifie
 }
 
 private fun LazyListScope.header(title: Int) {
-    item(key = "h:$title") { SectionHeader(stringResource(title), Modifier.padding(start = 0.dp)) }
+    item(key = "h:$title") { SectionHeader(stringResource(title), inset = 0.dp) }
 }
 
 private fun LazyListScope.installedSection(state: ModelsUiState, actions: ModelsActions) {

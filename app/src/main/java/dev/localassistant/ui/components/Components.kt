@@ -24,17 +24,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.localassistant.ui.theme.Spacing
 
-/** Title above a group of related rows. */
+/**
+ * Title above a group of related rows. [inset] lines it up with list rows; screens whose content
+ * is already padded pass 0.
+ */
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier) {
+fun SectionHeader(title: String, modifier: Modifier = Modifier, inset: Dp = Spacing.l) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(start = Spacing.l, end = Spacing.l, top = Spacing.xl, bottom = Spacing.xs),
+        modifier = modifier.padding(start = inset, end = inset, top = Spacing.xl, bottom = Spacing.xs),
     )
 }
 

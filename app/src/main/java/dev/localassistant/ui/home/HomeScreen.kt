@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -105,7 +106,10 @@ private fun ReadyCard(activeModel: String?, onTry: () -> Unit, onOpenModels: () 
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 Button(onClick = onTry) { Text(stringResource(R.string.home_try)) }
-                TextButton(onClick = onOpenModels) { Text(stringResource(R.string.home_change_model)) }
+                TextButton(
+                    onClick = onOpenModels,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                ) { Text(stringResource(R.string.home_change_model)) }
             }
         }
     }
