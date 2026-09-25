@@ -14,7 +14,8 @@ import org.json.JSONObject
 
 /** Starts an activity through whoever is allowed to do it right now. */
 fun interface ActivityLauncher {
-    fun launch(intent: Intent)
+    /** [leavesPanel] is true when the activity shows its own screen, so the panel should close. */
+    fun launch(intent: Intent, leavesPanel: Boolean)
 }
 
 /** An action the model proposed; it only runs when the user taps it. */
@@ -36,7 +37,7 @@ class ActionQueue {
     fun confirm(launcher: ActivityLauncher) {
         val action = _pending.value ?: return
         _pending.value = null
-        launcher.launch(action.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        launcher.launch(action.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true)
     }
 }
 
@@ -63,7 +64,7 @@ class TimerTool(private val launcher: ActivityLauncher, private val listener: To
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
             .apply { label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it) } }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(launcher, intent, "timer started")
+        return start(launcher, intent, "timer started", leavesPanel = false)
     }
 }
 
@@ -92,7 +93,7 @@ class AlarmTool(private val launcher: ActivityLauncher, private val listener: To
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
             .apply { label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it) } }
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(launcher, intent, "alarm set for %02d:%02d".format(hour, minute))
+        return start(launcher, intent, "alarm set for %02d:%02d".format(hour, minute), leavesPanel = false)
     }
 }
 
@@ -294,7 +295,7 @@ class MapsTool(
     }
 }
 
-private fun start(launcher: ActivityLauncher, intent: Intent, done: String): String = runCatching {
-    launcher.launch(intent)
+private fun start(launcher: ActivityLauncher, intent: Intent, done: String, leavesPanel: Boolean = true): String = runCatching {
+    launcher.launch(intent, leavesPanel)
     JSONObject().put("status", done).toString()
 }.getOrElse { JSONObject().put("error", it.message ?: "could not start the action").toString() }

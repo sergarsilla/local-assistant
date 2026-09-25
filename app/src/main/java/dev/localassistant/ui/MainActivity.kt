@@ -26,8 +26,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.localassistant.AssistantRuntime
 import dev.localassistant.R
 
 class MainActivity : ComponentActivity() {
@@ -126,8 +129,42 @@ private fun SetupScreen(isAssistant: Boolean, onOpenSettings: () -> Unit, modifi
         )
         Button(onClick = onOpenSettings) { Text(stringResource(R.string.setup_open_settings)) }
         ScreenContextStatus()
+        BrainSettings()
         VoiceSetup()
         LanguagePicker()
+    }
+}
+
+/** Acceleration and the one feature that can reach the internet, both the user's call. */
+@Composable
+private fun BrainSettings() {
+    val acceleration by AssistantRuntime.engine.acceleration.collectAsState()
+    val webSearch by AssistantRuntime.tools.webSearch.collectAsState()
+    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.brain_title), style = MaterialTheme.typography.titleMedium)
+        SettingSwitch(
+            label = stringResource(R.string.brain_gpu),
+            note = stringResource(if (acceleration.gpuBroken) R.string.brain_gpu_broken else R.string.brain_gpu_note),
+            checked = acceleration.useGpu && !acceleration.gpuBroken,
+            onChange = AssistantRuntime.engine::setUseGpu,
+        )
+        SettingSwitch(
+            label = stringResource(R.string.brain_web_search),
+            note = stringResource(R.string.brain_web_search_note),
+            checked = webSearch,
+            onChange = AssistantRuntime.tools::setWebSearch,
+        )
+    }
+}
+
+@Composable
+private fun SettingSwitch(label: String, note: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

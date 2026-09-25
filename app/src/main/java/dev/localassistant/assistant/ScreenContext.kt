@@ -13,25 +13,32 @@ class ScreenContext {
     private val _text = MutableStateFlow<String?>(null)
     val text: StateFlow<String?> = _text.asStateFlow()
 
+    private val _attach = MutableStateFlow(false)
+
+    /** The panel's "Screen" chip: send what is on screen with every question. */
+    val attach: StateFlow<Boolean> = _attach.asStateFlow()
+
+    fun setAttach(value: Boolean) {
+        _attach.value = value
+    }
+
+    /**
+     * The screen text to send with [question]: always when the chip is on, and also when the
+     * question itself is about the screen ("resume esto", "what does this say"), so asking out
+     * loud works without touching anything.
+     */
+    fun textFor(question: String): String? {
+        val current = _text.value ?: return null
+        return current.takeIf { _attach.value || MENTIONS_SCREEN.containsMatchIn(question) }
+    }
+
     fun update(structure: AssistStructure?) {
         _text.value = structure?.let(::flatten)?.takeIf { it.isNotBlank() }
     }
 
-    /** Wraps the question with what is on screen, clearly separated so the model can quote it. */
-    fun withScreen(question: String, screenText: String?): String {
-        if (screenText.isNullOrBlank()) return question
-        return buildString {
-            appendLine("Text currently on the user's screen:")
-            appendLine("---")
-            appendLine(screenText)
-            appendLine("---")
-            appendLine()
-            append(question)
-        }
-    }
-
     fun clear() {
         _text.value = null
+        _attach.value = false
     }
 
     private fun flatten(structure: AssistStructure): String {
@@ -55,5 +62,11 @@ class ScreenContext {
 
     private companion object {
         const val MAX_CHARS = 4000
+        val MENTIONS_SCREEN = Regex(
+            "\\b(pantalla|esto|esta p[aá]gina|este (texto|art[ií]culo|mensaje|correo)|lo que (pone|dice|veo|hay)|" +
+                "res[uú]me(lo|me)?|resumen|trad[uú]ce(lo|me)?|screen|this (page|text|article|message|email)|" +
+                "what does (this|it) say|summari[sz]e|translate this)\\b",
+            RegexOption.IGNORE_CASE,
+        )
     }
 }

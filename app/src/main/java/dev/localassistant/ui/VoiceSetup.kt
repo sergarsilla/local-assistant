@@ -76,7 +76,7 @@ fun VoiceSetup() {
             PackRow(
                 pack = pack,
                 installed = pack in installed,
-                inUse = prefs.speechToText == pack,
+                inUse = prefs.activeSpeechToText == pack,
                 transfer = transfers[pack.id],
                 onDownload = { ModelDownloadService.startPack(context, pack) },
                 onUse = { settings.update { it.copy(speechToText = pack) } },

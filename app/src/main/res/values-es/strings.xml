@@ -23,7 +23,7 @@
     <string name="panel_stop">Parar</string>
     <string name="panel_greeting">¡Hola! ¿En qué te ayudo?</string>
     <string name="panel_loading_model">Cargando %1$s…</string>
-    <string name="panel_model_ready">%1$s</string>
+    <string name="panel_model_ready">%1$s · %2$s</string>
     <string name="panel_no_model">Aún no hay ningún modelo instalado.</string>
     <string name="panel_open_models">Elegir un modelo</string>
     <string name="panel_error">Algo ha fallado: %1$s</string>
@@ -33,7 +33,6 @@
     <string name="panel_tool_generic">%1$s: %2$s</string>
     <string name="panel_action_confirm">Confirmar</string>
     <string name="panel_action_discard">Descartar</string>
-    <string name="panel_no_tools">Este modelo no puede usar acciones ni buscar en internet. Elige un modelo LiteRT-LM para eso.</string>
 
     <string name="panel_use_screen">Pantalla</string>
     <string name="panel_screen_off">El texto de pantalla está desactivado. Actívalo en los ajustes del asistente.</string>
@@ -93,7 +92,7 @@
     <string name="models_no_files">Este repositorio no tiene modelos compatibles en un solo archivo.</string>
     <string name="models_import">Importar un archivo</string>
     <string name="models_import_unsupported">Archivo no compatible: %1$s. Usa .gguf o .litertlm.</string>
-    <string name="models_network_note">Las descargas vienen directamente de huggingface.co. Nada más usa la red.</string>
+    <string name="models_network_note">Las descargas vienen directamente de huggingface.co. Lo único más que usa la red es la búsqueda web, y solo si la activas.</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
 
@@ -114,4 +113,13 @@
     <string name="download_channel">Descargas de modelos</string>
     <string name="download_notification_title">Descargando %1$s</string>
     <string name="action_cancel">Cancelar</string>
+
+    <string name="brain_title">Modelo e internet</string>
+    <string name="brain_gpu">Acelerar con la GPU (modelos LiteRT-LM)</string>
+    <string name="brain_gpu_note">Con la GPU, Gemma 4 E2B responde más del doble de rápido. Si el driver falla, la app vuelve sola a la CPU.</string>
+    <string name="brain_gpu_broken">La GPU falló en este móvil y se está usando la CPU. Desactiva y vuelve a activar el interruptor para reintentarlo.</string>
+    <string name="brain_web_search">Permitir búsquedas en internet</string>
+    <string name="brain_web_search_note">Desactivado, nada sale del móvil. Activado, el modelo puede enviar consultas a DuckDuckGo y leer páginas cuando le preguntes algo reciente.</string>
+    <string name="dictation_no_model">No hay ningún modelo de voz instalado. Descarga uno en Asistente local → Configuración.</string>
+    <string name="dictation_done">Listo</string>
 </resources>

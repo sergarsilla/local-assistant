@@ -23,7 +23,7 @@
     <string name="panel_stop">Stop</string>
     <string name="panel_greeting">Hi! How can I help?</string>
     <string name="panel_loading_model">Loading %1$s…</string>
-    <string name="panel_model_ready">%1$s</string>
+    <string name="panel_model_ready">%1$s · %2$s</string>
     <string name="panel_no_model">No model installed yet.</string>
     <string name="panel_open_models">Choose a model</string>
     <string name="panel_error">Something went wrong: %1$s</string>
@@ -33,7 +33,6 @@
     <string name="panel_tool_generic">%1$s: %2$s</string>
     <string name="panel_action_confirm">Confirm</string>
     <string name="panel_action_discard">Discard</string>
-    <string name="panel_no_tools">This model cannot use actions or web search. Pick a LiteRT-LM model for that.</string>
 
     <string name="panel_use_screen">Screen</string>
     <string name="panel_screen_off">Screen text is off. Turn on "Use text from screen" in the assistant settings.</string>
@@ -93,7 +92,7 @@
     <string name="models_no_files">No compatible single-file models in this repository.</string>
     <string name="models_import">Import a file</string>
     <string name="models_import_unsupported">Unsupported file: %1$s. Use .gguf or .litertlm.</string>
-    <string name="models_network_note">Downloads come straight from huggingface.co. Nothing else uses the network.</string>
+    <string name="models_network_note">Downloads come straight from huggingface.co. The only other use of the network is web search, and only if you turn it on.</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
 
@@ -114,4 +113,13 @@
     <string name="download_channel">Model downloads</string>
     <string name="download_notification_title">Downloading %1$s</string>
     <string name="action_cancel">Cancel</string>
+
+    <string name="brain_title">Model and internet</string>
+    <string name="brain_gpu">Use the GPU (LiteRT-LM models)</string>
+    <string name="brain_gpu_note">On the GPU, Gemma 4 E2B answers more than twice as fast. If the driver fails, the app falls back to the CPU by itself.</string>
+    <string name="brain_gpu_broken">The GPU failed on this phone and the CPU is being used. Turn the switch off and on again to retry.</string>
+    <string name="brain_web_search">Allow web searches</string>
+    <string name="brain_web_search_note">When off, nothing leaves the phone. When on, the model can send queries to DuckDuckGo and read pages when you ask about something recent.</string>
+    <string name="dictation_no_model">No speech model is installed. Download one in Local Assistant → Settings.</string>
+    <string name="dictation_done">Done</string>
 </resources>

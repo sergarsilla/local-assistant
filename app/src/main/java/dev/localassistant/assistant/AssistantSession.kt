@@ -3,6 +3,8 @@ package dev.localassistant.assistant
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.service.voice.VoiceInteractionSession.AssistState
 import android.service.voice.VoiceInteractionSession
@@ -42,13 +44,14 @@ class AssistantSession(context: Context) :
     private val savedStateController = SavedStateRegistryController.create(this)
     private val store = ViewModelStore()
     private var showRequestedAt = 0L
+    private val mainHandler = Handler(Looper.getMainLooper())
     val screen = ScreenContext()
     private val chat = ChatSession(
         holder = AssistantRuntime.engine,
         scope = AssistantRuntime.scope,
         tools = AssistantRuntime.tools,
         history = AssistantRuntime.history,
-    )
+    ).apply { screenFor = screen::textFor }
     private val voice = VoiceController(
         context = context,
         chat = chat,
@@ -100,13 +103,15 @@ class AssistantSession(context: Context) :
     override fun onShow(args: Bundle?, showFlags: Int) {
         showRequestedAt = SystemClock.elapsedRealtime()
         super.onShow(args, showFlags)
-        // Start loading while the user is still typing or speaking.
-        AssistantRuntime.engine.preload()
+        // Load the model and process the fixed start of the prompt while the user is still
+        // typing or speaking.
+        AssistantRuntime.engine.preload(chat::preface)
         voice.preload()
-        // Sending the user to another app means getting out of their way.
-        AssistantRuntime.tools.activityStarter = { intent ->
+        // Sending the user to another app means getting out of their way; a timer does not.
+        AssistantRuntime.tools.activityStarter = { intent, leavesPanel ->
             startAssistantActivity(intent)
-            hide()
+            // Tools run on the model's thread; the session is only touched on the main one.
+            if (leavesPanel) mainHandler.post { hide() }
         }
         if (AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED

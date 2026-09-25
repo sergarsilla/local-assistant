@@ -61,7 +61,6 @@ import androidx.compose.ui.platform.LocalContext
 import dev.localassistant.AssistantRuntime
 import dev.localassistant.R
 import dev.localassistant.assistant.ScreenContext
-import dev.localassistant.models.ModelFormat
 import dev.localassistant.llm.ChatError
 import dev.localassistant.llm.ChatSession
 import dev.localassistant.llm.EngineState
@@ -138,7 +137,7 @@ private fun PanelContent(
     val pendingAction by AssistantRuntime.tools.actions.pending.collectAsState()
     val context = LocalContext.current
     val screenText by screen.text.collectAsState()
-    var useScreen by remember { mutableStateOf(false) }
+    val useScreen by screen.attach.collectAsState()
     var language by remember { mutableStateOf(voice.language) }
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -151,9 +150,9 @@ private fun PanelContent(
     }
 
     val submit = {
-        val question = if (useScreen) screen.withScreen(input, screenText) else input
-        // In conversation mode a typed question is answered out loud too.
-        if (conversation) voice.ask(question) else chat.send(question)
+        // In conversation mode a typed question is answered out loud too. The chat adds the
+        // screen text itself when the chip is on or the question is about the screen.
+        if (conversation) voice.ask(input) else chat.send(input)
         input = ""
     }
 
@@ -163,7 +162,7 @@ private fun PanelContent(
             if (screenText != null) {
                 FilterChip(
                     selected = useScreen,
-                    onClick = { useScreen = !useScreen },
+                    onClick = { screen.setAttach(!useScreen) },
                     label = { Text(stringResource(R.string.panel_use_screen)) },
                 )
             }
@@ -191,13 +190,6 @@ private fun PanelContent(
             items(messages) { MessageRow(it) }
         }
         ChatErrorRow(error, onOpenModels = { onOpenApp(MainActivity.TAB_MODELS) })
-        if (AssistantRuntime.models.active?.format == ModelFormat.GGUF) {
-            Text(
-                stringResource(R.string.panel_no_tools),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         if (generating) {
             toolActivity?.let { activity ->
                 Text(
@@ -280,7 +272,7 @@ private fun PanelContent(
 private fun EngineStatus(state: EngineState, modifier: Modifier) {
     val text = when (state) {
         is EngineState.Loading -> stringResource(R.string.panel_loading_model, shortName(state.model))
-        is EngineState.Ready -> stringResource(R.string.panel_model_ready, shortName(state.model))
+        is EngineState.Ready -> stringResource(R.string.panel_model_ready, shortName(state.model), state.backend)
         else -> ""
     }
     Text(

@@ -67,13 +67,14 @@ fun ModelsScreen(modifier: Modifier = Modifier) {
     val installed by store.installed.collectAsState()
     val activeName by store.activeName.collectAsState()
     val transfers by Transfers.state.collectAsState()
-    val scope = rememberCoroutineScope()
     var pendingDelete by remember { mutableStateOf<InstalledModel?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            scope.launch {
+            importError = null
+            // A multi-GB copy must survive leaving this tab, so it runs on the app's scope.
+            AssistantRuntime.scope.launch {
                 AssistantRuntime.importer.import(uri).onFailure { e ->
                     if (e is IllegalArgumentException) importError = e.message
                 }
