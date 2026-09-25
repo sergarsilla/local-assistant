@@ -1,7 +1,7 @@
 package dev.localassistant.assistant
 
 import android.content.Context
-import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -28,8 +28,12 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.localassistant.AssistantRuntime
 import dev.localassistant.llm.ChatSession
 import dev.localassistant.voice.VoiceController
-import dev.localassistant.ui.AssistantPanel
+import dev.localassistant.wake.WakeWordService
 import dev.localassistant.ui.MainActivity
+import dev.localassistant.ui.navigation.Destination
+import dev.localassistant.ui.panel.PanelRoute
+import dev.localassistant.ui.theme.AssistantTheme
+import kotlinx.coroutines.launch
 
 /**
  * The session window is not an Activity, so it has to provide the owners Compose expects.
@@ -51,7 +55,7 @@ class AssistantSession(context: Context) :
         scope = AssistantRuntime.scope,
         tools = AssistantRuntime.tools,
         history = AssistantRuntime.history,
-    ).apply { screenFor = screen::textFor }
+    ).apply { screenFor = screen::attachmentFor }
     private val voice = VoiceController(
         context = context,
         chat = chat,
@@ -80,14 +84,9 @@ class AssistantSession(context: Context) :
         return ComposeView(context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AssistantSession))
             setContent {
-                AssistantPanel(
-                    chat = chat,
-                    voice = voice,
-                    screen = screen,
-                    engineState = AssistantRuntime.engine.state,
-                    onDismiss = ::hide,
-                    onOpenApp = ::openApp,
-                )
+                AssistantTheme {
+                    PanelRoute(chat = chat, voice = voice, screen = screen, onDismiss = ::hide, onOpenApp = ::openApp)
+                }
             }
         }
     }
@@ -100,9 +99,22 @@ class AssistantSession(context: Context) :
         }
     }
 
+    override fun onHandleScreenshot(screenshot: Bitmap?) {
+        super.onHandleScreenshot(screenshot)
+        // Scaling and compressing takes a few tens of milliseconds; the panel does not wait for it.
+        AssistantRuntime.scope.launch { screen.updateScreenshot(screenshot) }
+    }
+
     override fun onShow(args: Bundle?, showFlags: Int) {
         showRequestedAt = SystemClock.elapsedRealtime()
         super.onShow(args, showFlags)
+        args?.getLong(AssistantService.EXTRA_CONVERSATION_ID, NO_CONVERSATION)
+            ?.takeIf { it != NO_CONVERSATION }
+            ?.let(chat::resume)
+        val byWakeWord = args?.getBoolean(AssistantService.EXTRA_WAKE_WORD, false) == true
+        // The panel needs the microphone; the wake word spotter lets go of it until the panel closes.
+        AssistantRuntime.wakeWord.setPaused(true)
+        WakeWordService.syncWithSettings(context)
         // Load the model and process the fixed start of the prompt while the user is still
         // typing or speaking.
         AssistantRuntime.engine.preload(chat::preface)
@@ -113,7 +125,7 @@ class AssistantSession(context: Context) :
             // Tools run on the model's thread; the session is only touched on the main one.
             if (leavesPanel) mainHandler.post { hide() }
         }
-        if (AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
+        if (byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
         logFirstFrame()
@@ -126,6 +138,7 @@ class AssistantSession(context: Context) :
         chat.stop()
         voice.onHide()
         AssistantRuntime.engine.scheduleRelease()
+        AssistantRuntime.wakeWord.setPaused(false)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
@@ -136,9 +149,13 @@ class AssistantSession(context: Context) :
         super.onDestroy()
     }
 
-    private fun openApp(tab: Int) {
-        startAssistantActivity(Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, tab))
+    private fun openApp(destination: Destination) {
+        startAssistantActivity(MainActivity.intent(context, destination))
         hide()
+    }
+
+    private companion object {
+        const val NO_CONVERSATION = -1L
     }
 
     private fun logFirstFrame() {

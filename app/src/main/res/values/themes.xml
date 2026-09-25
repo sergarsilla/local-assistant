@@ -1,3 +1,10 @@
 <resources>
     <style name="Theme.LocalAssistant" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- Sheets drawn by Compose over the app that asked for them, like the dictation dialog. -->
+    <style name="Theme.LocalAssistant.Translucent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>
