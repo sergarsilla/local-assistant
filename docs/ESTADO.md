@@ -117,7 +117,7 @@ dictado para los botones de micrófono de otras apps.
   ~52 tok/s para Gemma 4 E2B en GPU frente a los ~19–20 tok/s que la app medía en CPU. Como los
   drivers de GPU pueden matar el proceso en vez de lanzar una excepción, se escribe una marca
   antes del intento y se borra después: si al arrancar la marca sigue ahí, la GPU nos tumbó y no
-  se reintenta hasta que lo pidas (interruptor en Configuración). La cabecera del panel muestra
+  se reintenta hasta que lo vuelvas a elegir (Ajustes → Modelo). La cabecera del panel muestra
   `· GPU` o `· CPU`.
 - **Pre-relleno del prefacio al abrir el panel.** El prompt de sistema + definiciones de
   herramientas son ~900 tokens que antes se procesaban *después* de que terminaras de hablar.
@@ -202,32 +202,37 @@ dictado para los botones de micrófono de otras apps.
 (c) usar la visión de Gemma 4 para «¿qué hay en mi pantalla?» con la captura del asistente;
 (d) probar Qwen 3.5 en GGUF para español frente a Gemma 4 E2B.
 
-## 6. Pendiente y próximos pasos (por prioridad)
+## 6. Próximos pasos: estado
 
-1. **Verificar en el Pixel 10** (§7). Todo lo de arriba está revisado y la lógica no-Compose se
-   compiló contra el framework de Android, pero aquí no hay SDK: el build completo lo hace el CI
-   y la prueba real solo puede ser en el dispositivo.
-2. **Teclado de voz (IME)** con el mismo STT: dictado en cualquier campo de texto.
-3. **Captura de pantalla + Gemma 4 visión**: `onHandleScreenshot` + `Content.ImageBytes`
-   (requiere `visionBackend` y más memoria; hacerlo opcional).
-4. **Contactos para `send_message`**: hoy el destinatario es el texto literal («mamá»), así que
-   la app de mensajes recibe un número inválido. Resolver nombres con `READ_CONTACTS` (permiso
-   opcional) o abrir el selector de contactos.
-5. **Continuar una conversación del historial** en el panel.
-6. **Catálogo**: añadir Qwen 3.5 (GGUF) tras medirlo en español; los Kokoro ES y EN descargan el
-   mismo repositorio dos veces (190 MB cada uno) — compartir directorio.
-7. **Palabra de activación opcional** (openWakeWord en un servicio en primer plano), desactivada
-   por defecto, con su coste de batería medido y visible.
-8. **NPU del Tensor** (`Backend.GOOGLE_TENSOR`) como opción experimental cuando haya modelos
-   compilados para ella.
-9. **Tests**: `LanguageGuess`, la detección de «habla de la pantalla», `OpenAppTool.score` y
-   `ReadPageTool` son lógica pura, fáciles de cubrir con tests JVM.
+Los pasos propuestos en la primera revisión se implementaron en la segunda iteración (§8):
+
+| # | Paso | Estado |
+|---|---|---|
+| 1 | Verificar en el Pixel 10 | **Pendiente**: sigue siendo lo primero (§7) |
+| 2 | Teclado de voz (IME) | ✅ `VoiceKeyboardService` con subtipos «voz» es/en |
+| 3 | Captura + visión de Gemma 4 | ✅ Opcional en Ajustes → Modelo («Entender capturas») |
+| 4 | Contactos para mensajes | ✅ Y llamadas (`call_contact`, abre el marcador) |
+| 5 | Continuar una conversación | ✅ Chats → conversación → «Continuar en el asistente» |
+| 6 | Catálogo: Kokoro duplicado | ✅ Directorio compartido con migración. Qwen 3.5 **pendiente** de medir en español |
+| 7 | Palabra de activación | ✅ Experimental, desactivada por defecto (KWS de sherpa-onnx, no openWakeWord: ver §8) |
+| 8 | NPU del Tensor | ✅ Experimental en Ajustes → Modelo, con vuelta automática a GPU/CPU |
+| 9 | Tests | ✅ 28 tests JVM + capturas de todas las pantallas en CI |
+
+Lo que queda abierto:
+
+- **Medir en el dispositivo**: latencia hasta la primera palabra con el pre-relleno, tok/s en GPU,
+  RAM con el codificador de visión cargado y batería con la palabra de activación activa.
+- **Frases de activación en español**: el único modelo KWS pequeño y libre es inglés; habría que
+  entrenar uno (icefall) o validar cómo reconoce frases como «oye asistente».
+- **Qwen 3.5 en el catálogo** tras compararlo en español con Gemma 4 E2B.
+- **Android Auto**: pedido en los foros; requiere una app de mensajería/medios certificada, fuera
+  de alcance por ahora.
 
 ## 7. Cómo verificar en el móvil
 
 ```bash
 ./gradlew :app:installDebug
-adb logcat -s EngineHolder LiteRtEngine LlamaCppEngine ChatSession VoiceController Speaker TtsVoices SpeechHolder RecognizeSpeech
+adb logcat -s EngineHolder LiteRtEngine LlamaCppEngine ChatSession VoiceController Speaker TtsVoices SpeechHolder Dictation WakeWord
 ```
 
 Qué comprobar:
@@ -246,3 +251,66 @@ Qué comprobar:
 - **Dictado de otras apps**: pulsar el micrófono de una barra de búsqueda (la de un navegador o una
   app de notas) — debe salir el diálogo «Escuchando…».
 - **Reposo**: `adb shell dumpsys meminfo dev.localassistant` 60 s después de cerrar el panel.
+- **Teclado de voz**: activarlo desde Inicio, abrir cualquier campo de texto y elegirlo en el
+  selector de teclado; con HeliBoard/FUTO, la tecla de micrófono debería saltar a él.
+- **Contactos**: permitirlos en Ajustes y pedir «escribe a <nombre> que…» y «llama a <nombre>».
+- **Visión**: activar «Entender capturas» y «Usar captura de pantalla» en los ajustes del asistente,
+  abrir el panel sobre una foto y preguntar «¿qué hay en la pantalla?». Vigilar la memoria.
+- **Palabra de activación**: activarla en Ajustes con la app como asistente, bloquear la pantalla
+  un rato y medir el consumo en Ajustes → Batería; decir «Hey computer» con el móvil desbloqueado.
+- **Capturas del CI**: descargar el artefacto `screenshots` de la ejecución del workflow.
+
+## 8. Segunda iteración: UI/UX y siguientes pasos
+
+### Arquitectura de la interfaz
+
+- **Sistema de diseño** (`ui/theme`, `ui/components`): Material 3 con color dinámico, formas y
+  espaciados comunes, iconos Material desde su trazado (sin el artefacto `icons-extended`), filas
+  de ajustes donde toda la fila actúa, estados vacíos, diálogos de confirmación, anillo de nivel del
+  micrófono e indicador de «escribiendo».
+- **Route / Screen / ViewModel**: cada pantalla tiene un `UiState` inmutable, una interfaz de
+  acciones y un composable sin estado; la *Route* conecta con el `ViewModel`, que combina los
+  `StateFlow` del runtime. Los mensajes puntuales (sin espacio, no es el asistente) son eventos de
+  un solo uso que se muestran en un `Snackbar` compartido.
+- **Markdown** propio (`ui/markdown`): parser puro y tolerante con texto a medio llegar (listas,
+  negrita, cursiva, código, enlaces), renderizado seleccionable y con botón de copiar.
+
+### Pantallas
+
+- **Panel**: sugerencias al abrir vacío, cabecera con modelo y acelerador, «nueva conversación»,
+  tarjetas de acción que dicen qué va a pasar, estado de voz claro y un único botón principal
+  (hablar / dejar de escuchar / parar la respuesta) con respuesta háptica.
+- **Inicio**: lista de configuración con descarga en línea (Parakeet, Gemma 4, voz), estado de cada
+  paso, «Probar ahora» cuando todo está listo y consejos de uso.
+- **Modelos**: espacio libre, modelo activo destacado (tamaño, formato, tok/s y si va en GPU),
+  reintentar descargas, recomendados con aviso de espacio y búsqueda en Hugging Face.
+- **Chats**: agrupados por día, búsqueda, detalle con Markdown y «Continuar en el asistente».
+- **Ajustes**: asistente, voz, dictado, manos libres, modelo, privacidad (búsqueda web, guardar
+  conversaciones, contactos) e idioma.
+
+### Funciones nuevas
+
+- **Teclado de voz** (`keyboard/`): micro grande, puntuación rápida, espacio, borrar, intro que
+  respeta la acción del campo y vuelta al teclado anterior; une el texto dictado con el espacio y
+  la mayúscula correctos. Comparte la lógica (`voice/Dictation`) con el diálogo de los botones de
+  micrófono de otras apps.
+- **Palabra de activación** (`wake/`): el modelo de *keyword spotting* zipformer de 3,3 M de
+  parámetros de sherpa-onnx, en int8 dentro del APK (5 MB), escucha en un servicio en primer plano
+  de tipo micrófono. Se eligió en lugar de openWakeWord porque sherpa-onnx ya está en la app (mismo
+  JNI, sin dependencias nuevas) y admite frases arbitrarias. Las frases se tokenizaron con el
+  `bpe.model` del propio modelo y se comprobó en streaming con sus grabaciones de prueba (detecta
+  las frases presentes, sin falsos positivos con las demás).
+- **Visión**: la captura del asistente se reduce a 768 px y va como `Content.ImageBytes` cuando el
+  modelo se cargó con su codificador de visión; si el modelo no lo tiene, se recarga solo para texto.
+- **Contactos y llamadas**, **conversaciones retomables**, **guardar historial opcional**,
+  **descargas con reintento y comprobación de espacio**, **Kokoro sin duplicar**.
+
+### Calidad y verificación
+
+- Todo el código (lógica y Compose) se compila en este entorno contra Compose Multiplatform de
+  escritorio, el framework de Android de Robolectric y stubs mínimos de AndroidX; el CI compila el
+  APK real en cada push.
+- **Tests JVM** (`app/src/test`): 28 tests de lógica pura. Encontraron un fallo real: «Ana» empataba
+  entre «Ana García» y «Anabel».
+- **Capturas** (Roborazzi + Robolectric): cada pantalla en sus estados importantes, en claro y
+  oscuro, publicadas por el CI como artefacto `screenshots`.

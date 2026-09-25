@@ -18,18 +18,23 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Speech in and out.** Offline recognition (NVIDIA Parakeet or Canary via sherpa-onnx) and
   offline synthesis (Piper or Kokoro voices), with a conversation mode that keeps listening
   between turns. Replies are spoken with a voice of their own language.
-- **Offline dictation for the whole phone.** As the assistant it is also the system recognizer,
-  and it answers the microphone button of other apps (`ACTION_RECOGNIZE_SPEECH`), which nothing
-  handles on GrapheneOS without Google's app.
-- **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events and
-  text messages. Anything that sends or creates something waits for an explicit confirmation.
+- **Offline dictation for the whole phone.** As the assistant it is also the system recognizer;
+  it answers the microphone button of other apps (`ACTION_RECOGNIZE_SPEECH`), which nothing
+  handles on GrapheneOS without Google's app; and it ships a voice keyboard for any text field.
+- **Optional wake word.** A 5 MB keyword spotter bundled in the APK can listen for "Hey computer"
+  in the background. Off by default, with a notification while it runs.
+- **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events, text
+  messages and calls, finding people in your contacts if you allow it. Anything that sends or
+  creates something waits for an explicit confirmation.
 - **Searches the web only if you turn it on.** Off by default. When enabled, the model can query
   DuckDuckGo and read public HTTPS pages as text; no browser is opened. Remove the network
   permission and everything else still works.
 - **Reads the screen on request.** Only when Android's "use text from screen" is enabled, and only
-  when you tap the chip or ask about the screen ("summarise this").
-- **Keeps history on the phone.** Conversations are stored in SQLite with `secure_delete`, and
-  deleting one rewrites the database file so the text is really gone.
+  when you tap the chip or ask about the screen ("summarise this"). With a vision model, it can
+  also look at a screenshot.
+- **Keeps history on the phone, if you want.** Conversations are stored in SQLite with
+  `secure_delete`; deleting one rewrites the database file so the text is really gone, and saving
+  can be turned off. Any conversation can be continued in the assistant.
 - **Costs nothing when idle.** The model is released a few seconds after the panel closes:
   ~340 MB resident and about 10 ms of CPU per minute.
 
@@ -49,8 +54,26 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Then open the app, choose it as the digital assistant in Android's settings, and download a model
-from the Models tab. Both GGUF and LiteRT-LM models can use the phone actions.
+Then open the app: the Home tab walks through setting it as the assistant, the microphone and the
+downloads. Both GGUF and LiteRT-LM models can use the phone actions.
+
+## Code layout
+
+- `assistant/` — the `VoiceInteractionService`, its session (the panel) and the recognizers.
+- `llm/` — the engine interface, llama.cpp and LiteRT-LM engines, and the chat session.
+- `voice/`, `keyboard/`, `wake/` — speech in and out, dictation, the voice keyboard, the wake word.
+- `tools/` — what the model can do on the phone.
+- `ui/` — Compose screens as Route / Screen / ViewModel on a small design system in `ui/theme` and
+  `ui/components`.
+
+## Tests
+
+```bash
+./gradlew :app:testDebugUnitTest                              # unit tests
+./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true # plus screenshots of every screen
+```
+
+CI builds the APK and runs both on every push; the screenshots are published as an artifact.
 
 `docs/ESTADO.md` has the current review: what works, what was fixed, what is next and how to
 verify it on the phone.
