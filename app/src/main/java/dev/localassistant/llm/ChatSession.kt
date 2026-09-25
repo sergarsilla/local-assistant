@@ -2,19 +2,35 @@ package dev.localassistant.llm
 
 import android.util.Log
 import dev.localassistant.history.ConversationStore
+import dev.localassistant.tools.AssistantTool
 import dev.localassistant.tools.ToolRegistry
 import org.json.JSONObject
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-data class UiMessage(val role: Role, val text: String, val streaming: Boolean = false)
+/**
+ * A message as the panel shows it. [modelText] is what the model actually received, which can add
+ * the current time or the text on screen to what the user typed or said.
+ */
+data class UiMessage(
+    val role: Role,
+    val text: String,
+    val streaming: Boolean = false,
+    val modelText: String = text,
+)
 
 /** Receives the reply as it streams, e.g. to speak it aloud. */
 interface ReplyListener {
@@ -34,6 +50,13 @@ class ChatSession(
     private val tools: ToolRegistry? = null,
     private val history: ConversationStore? = null,
 ) {
+    /**
+     * Returns the on-screen text to hand the model along with a question, or null. Set by the
+     * assistant session, which knows what was on screen and whether the user asked about it.
+     */
+    @Volatile
+    var screenFor: (question: String) -> String? = { null }
+
     private var conversationId: Long? = null
     private val _messages = MutableStateFlow<List<UiMessage>>(emptyList())
     val messages: StateFlow<List<UiMessage>> = _messages.asStateFlow()
@@ -45,37 +68,53 @@ class ChatSession(
     val error: StateFlow<ChatError?> = _error.asStateFlow()
 
     private var job: Job? = null
+    private var turn = 0
 
+    /**
+     * Sends a question. If an answer is still being written it is stopped first, and the new
+     * question waits for it to wind down instead of being dropped.
+     */
+    @Synchronized
     fun send(text: String, listener: ReplyListener? = null) {
         val prompt = text.trim()
-        if (prompt.isEmpty() || _generating.value) return
-        _error.value = null
-        _messages.update { it + UiMessage(Role.USER, prompt) + UiMessage(Role.ASSISTANT, "", streaming = true) }
-        history?.let { store ->
-            val id = conversationId ?: store.startConversation(prompt).also { conversationId = it }
-            store.addMessage(id, Role.USER, prompt)
-        }
+        if (prompt.isEmpty()) return
+        val previous = job
+        previous?.cancel()
+        val myTurn = ++turn
         _generating.value = true
+        val modelText = decorate(prompt, screenFor(prompt))
         job = scope.launch {
+            previous?.cancelAndJoin()
+            _error.value = null
+            _messages.update {
+                it + UiMessage(Role.USER, prompt, modelText = modelText) + UiMessage(Role.ASSISTANT, "", streaming = true)
+            }
             try {
-                val engine = holder.acquire()
-                generateFitting(engine, listener)
+                persist(Role.USER, prompt)
+                holder.use { engine -> generateFitting(engine, listener) }
             } catch (e: NoModelException) {
                 _error.value = ChatError.NoModel
                 dropEmptyReply()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                Log.w(TAG, "Generation failed", e)
                 _error.value = ChatError.Failure(e.message ?: e.javaClass.simpleName)
                 dropEmptyReply()
             } finally {
                 listener?.onEnd()
-                persistReply()
+                val reply = _messages.value.lastOrNull()?.takeIf { it.role == Role.ASSISTANT }?.text.orEmpty()
                 _messages.update { list -> list.map { it.copy(streaming = false) } }
-                _generating.value = false
+                // Whatever the assistant managed to say is kept, including a reply cut short.
+                withContext(NonCancellable) { persist(Role.ASSISTANT, reply) }
+                synchronized(this@ChatSession) { if (turn == myTurn) _generating.value = false }
             }
         }
     }
+
+    /** The system message and tools every conversation starts with, for [EngineHolder.preload]. */
+    fun preface(): Pair<List<ChatMessage>, List<AssistantTool>> =
+        listOf(systemMessage()) to tools?.available().orEmpty()
 
     fun stop() {
         job?.cancel()
@@ -88,17 +127,22 @@ class ChatSession(
         conversationId = null
     }
 
-    /** Stores whatever the assistant managed to say, including a reply cut short. */
-    private fun persistReply() {
+    private suspend fun persist(role: Role, text: String) {
         val store = history ?: return
-        val id = conversationId ?: return
-        val reply = _messages.value.lastOrNull()?.takeIf { it.role == Role.ASSISTANT }?.text.orEmpty()
-        store.addMessage(id, Role.ASSISTANT, reply)
+        if (text.isBlank()) return
+        runCatching {
+            withContext(Dispatchers.IO) {
+                synchronized(store) {
+                    val id = conversationId ?: store.startConversation(text).also { conversationId = it }
+                    store.addMessage(id, role, text)
+                }
+            }
+        }.onFailure { Log.w(TAG, "Could not save the message", it) }
     }
 
     /** Drops the oldest turns until the conversation fits the context window. */
     private suspend fun generateFitting(engine: LlmEngine, listener: ReplyListener?) {
-        val history = _messages.value.dropLast(1).map { ChatMessage(it.role, it.text) }
+        val history = _messages.value.dropLast(1).map { ChatMessage(it.role, it.modelText) }
         var skip = 0
         while (true) {
             val window = listOf(systemMessage()) + history.drop(skip)
@@ -114,15 +158,17 @@ class ChatSession(
 
     /**
      * Engines that report tool calls instead of running them get the results appended to the
-     * conversation and are asked again, until they answer with text or the budget runs out.
+     * conversation and are asked again, until they answer with text. The last round offers no
+     * tools, so the model has to answer with what it has.
      */
     private suspend fun runWithTools(engine: LlmEngine, window: List<ChatMessage>, listener: ReplyListener?) {
         val available = if (engine.supportsTools) tools?.available().orEmpty() else emptyList()
         var conversation = window
-        repeat(MAX_TOOL_ROUNDS) {
+        for (round in 0 until MAX_TOOL_ROUNDS) {
+            val offered = if (round == MAX_TOOL_ROUNDS - 1) emptyList() else available
             val requested = mutableListOf<ToolCall>()
             var replyText = ""
-            engine.generate(conversation, available).collect { event ->
+            engine.generate(conversation, offered).collect { event ->
                 when (event) {
                     is GenerationEvent.Text -> {
                         replyText += event.chunk
@@ -144,16 +190,17 @@ class ChatSession(
             if (requested.isEmpty()) return
 
             val results = requested.map { call ->
-                val tool = available.firstOrNull { it.name == call.name }
-                val output = tool?.let { runCatching { it.run(JSONObject(call.arguments)) }.getOrElse { error -> 
-                    JSONObject().put("error", error.message ?: "tool failed").toString()
-                } } ?: JSONObject().put("error", "unknown tool").toString()
+                val tool = offered.firstOrNull { it.name == call.name }
+                val output = tool?.let {
+                    runCatching { it.run(JSONObject(call.arguments)) }.getOrElse { error ->
+                        JSONObject().put("error", error.message ?: "tool failed").toString()
+                    }
+                } ?: JSONObject().put("error", "unknown tool").toString()
                 Log.i(TAG, "Tool ${call.name} -> ${output.take(120)}")
                 ChatMessage(Role.TOOL, output, toolName = call.name)
             }
             conversation = conversation + ChatMessage(Role.ASSISTANT, replyText, toolCalls = requested) + results
         }
-        Log.w(TAG, "Gave up after $MAX_TOOL_ROUNDS tool rounds")
     }
 
     private fun appendToReply(chunk: String) = _messages.update { list ->
@@ -165,16 +212,48 @@ class ChatSession(
         if (list.lastOrNull()?.let { it.role == Role.ASSISTANT && it.text.isEmpty() } == true) list.dropLast(1) else list
     }
 
+    /**
+     * The clock goes with each question rather than in the system prompt: the system prompt then
+     * never changes, so both engines can keep it processed between questions.
+     */
+    private fun decorate(question: String, screenText: String?): String = buildString {
+        append('[')
+        append(SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()))
+        append(" ")
+        append(TimeZone.getDefault().id)
+        appendLine("]")
+        if (!screenText.isNullOrBlank()) {
+            appendLine("Text on the user's screen:")
+            appendLine("<<<")
+            appendLine(screenText)
+            appendLine(">>>")
+        }
+        append(question)
+    }
+
+    private fun systemMessage(): ChatMessage {
+        val canSearch = tools?.webSearchEnabled() == true
+        return ChatMessage(
+            Role.SYSTEM,
+            buildString {
+                append("You are a voice and text assistant running entirely on the user's Android phone. ")
+                append("Always reply in the language the user speaks or writes in (usually Spanish or English). ")
+                append("Be brief and direct: one to three short sentences unless asked for more, because replies are often read aloud. ")
+                append("Avoid tables and heavy markdown. ")
+                append("Each question starts with the current date and time in brackets; use it for times and dates, never mention it otherwise. ")
+                append("When the user asks you to do something on the phone, call the matching tool instead of explaining how to do it. ")
+                append("After a tool runs, confirm in a few words what was done. ")
+                if (canSearch) {
+                    append("Use web_search only for recent or local facts you cannot know; otherwise answer from your own knowledge.")
+                } else {
+                    append("You have no internet access; if something needs up-to-date information, say so briefly.")
+                }
+            },
+        )
+    }
+
     private companion object {
         const val TAG = "ChatSession"
         const val MAX_TOOL_ROUNDS = 4
     }
-
-    private fun systemMessage() = ChatMessage(
-        Role.SYSTEM,
-        "You are a helpful assistant running entirely on the user's phone, without internet access. " +
-            "Always reply in the language the user writes in. Be concise and direct; use short paragraphs " +
-            "or lists only when they help. Today is " +
-            DateFormat.getDateInstance(DateFormat.FULL).format(Date()) + ".",
-    )
 }

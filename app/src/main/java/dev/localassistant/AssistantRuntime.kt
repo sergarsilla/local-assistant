@@ -8,6 +8,7 @@ import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.ToolRegistry
 import dev.localassistant.voice.CaptureRecorder
 import dev.localassistant.voice.SpeechHolder
+import dev.localassistant.voice.TtsVoices
 import dev.localassistant.voice.VoicePacks
 import dev.localassistant.voice.VoiceSettings
 import java.io.File
@@ -24,6 +25,8 @@ object AssistantRuntime {
     lateinit var importer: ModelImporter
         private set
     lateinit var speech: SpeechHolder
+        private set
+    lateinit var ttsVoices: TtsVoices
         private set
     lateinit var voiceSettings: VoiceSettings
         private set
@@ -43,6 +46,7 @@ object AssistantRuntime {
         engine = EngineHolder(app, models, scope)
         importer = ModelImporter(app, models)
         speech = SpeechHolder(app, scope)
+        ttsVoices = TtsVoices(app, scope)
         voiceSettings = VoiceSettings(app)
         tools = ToolRegistry(app)
         history = ConversationStore(app)

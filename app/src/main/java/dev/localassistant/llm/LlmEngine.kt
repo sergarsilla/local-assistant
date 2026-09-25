@@ -43,6 +43,16 @@ interface LlmEngine : AutoCloseable {
     /** Models in formats without tool support answer from their own knowledge only. */
     val supportsTools: Boolean
 
+    /** Where the model runs, shown to the user: "CPU", "GPU"… */
+    val backendName: String get() = "CPU"
+
+    /**
+     * Processes the part of the prompt every conversation starts with (system prompt and tool
+     * definitions) ahead of time, so the first answer does not pay for it. Called while the user is
+     * still speaking or typing; [messages] holds just the system message.
+     */
+    suspend fun prepare(messages: List<ChatMessage>, tools: List<AssistantTool>) = Unit
+
     /** Streams the reply to the last user message; cancelling the collector stops generation. */
     fun generate(
         messages: List<ChatMessage>,

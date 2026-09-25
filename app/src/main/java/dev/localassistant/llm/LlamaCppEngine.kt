@@ -12,11 +12,39 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 /** GGUF models through llama.cpp on the CPU. */
 class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
 
     override val supportsTools = true
+
+    /**
+     * Decodes the system prompt and tool definitions into the KV cache. The chat is rendered with a
+     * placeholder question and nothing is generated; the real first question then reuses everything
+     * up to where the user's words start.
+     */
+    override suspend fun prepare(messages: List<ChatMessage>, tools: List<AssistantTool>) {
+        withContext(Dispatchers.IO) {
+            check(handle != 0L) { "Engine is closed" }
+            val started = System.currentTimeMillis()
+            val stats = LongArray(5)
+            val status = nativeGenerate(
+                handle,
+                messagesJson(messages + ChatMessage(Role.USER, ".")),
+                toolsJson(tools),
+                TEMPERATURE,
+                0,
+                object : NativeCallback {
+                    override fun onBytes(bytes: ByteArray) = false
+
+                    override fun onToolCall(name: String, arguments: String) = Unit
+                },
+                stats,
+            )
+            Log.i(TAG, "Prepared ${stats[0]} prompt tokens in ${System.currentTimeMillis() - started}ms (status $status)")
+        }
+    }
 
     override fun generate(
         messages: List<ChatMessage>,
