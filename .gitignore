@@ -13,6 +13,7 @@ captures/
 *.onnx
 # The voice activity detector ships inside the APK; everything else is downloaded at runtime.
 !app/src/main/assets/silero_vad.onnx
+!app/src/main/assets/kws/*.onnx
 .env
 
 # Personal project brief, not part of the published app

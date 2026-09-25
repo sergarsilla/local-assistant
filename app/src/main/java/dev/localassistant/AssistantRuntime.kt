@@ -11,6 +11,7 @@ import dev.localassistant.voice.SpeechHolder
 import dev.localassistant.voice.TtsVoices
 import dev.localassistant.voice.VoicePacks
 import dev.localassistant.voice.VoiceSettings
+import dev.localassistant.wake.WakeWordSettings
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,8 @@ object AssistantRuntime {
         private set
     lateinit var history: ConversationStore
         private set
+    lateinit var wakeWord: WakeWordSettings
+        private set
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -50,6 +53,7 @@ object AssistantRuntime {
         voiceSettings = VoiceSettings(app)
         tools = ToolRegistry(app)
         history = ConversationStore(app)
+        wakeWord = WakeWordSettings(app)
         VoicePacks.init(app)
         if (BuildConfig.DEBUG) {
             captures = CaptureRecorder(File(app.getExternalFilesDir("bench"), "captures"))
