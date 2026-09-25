@@ -3,6 +3,7 @@ package dev.localassistant.llm
 import android.os.SystemClock
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
@@ -30,6 +31,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class LiteRtEngine private constructor(
     private val engine: Engine,
     override val backendName: String,
+    override val supportsImages: Boolean,
 ) : LlmEngine {
 
     override val supportsTools = true
@@ -68,7 +70,7 @@ class LiteRtEngine private constructor(
         val text = Channel<String>(Channel.UNLIMITED)
         val stopped = CompletableDeferred<Unit>()
         active.sendMessageAsync(
-            Message.user(prompt.text),
+            userMessage(prompt),
             object : MessageCallback {
                 override fun onMessage(message: Message) {
                     text.trySend(message.toString())
@@ -97,7 +99,7 @@ class LiteRtEngine private constructor(
             completed = true
         } finally {
             if (completed) {
-                conversationHistory = messages + ChatMessage(Role.ASSISTANT, reply.toString())
+                conversationHistory = (messages + ChatMessage(Role.ASSISTANT, reply.toString())).withoutImages()
             } else {
                 // LiteRT-LM cannot roll back a cancelled turn, so the next call rebuilds the conversation.
                 conversationHistory = null
@@ -122,8 +124,15 @@ class LiteRtEngine private constructor(
         )
     }.flowOn(Dispatchers.IO)
 
+    private fun userMessage(message: ChatMessage): Message {
+        val image = message.image?.takeIf { supportsImages } ?: return Message.user(message.text)
+        return Message.user(Contents.of(Content.ImageBytes(image), Content.Text(message.text)))
+    }
+
     private fun conversationFor(prior: List<ChatMessage>, tools: List<AssistantTool>, prefill: Boolean): Conversation {
-        conversation?.takeIf { conversationHistory == prior && conversationTools == tools }?.let { return it }
+        // Images are left out of the comparison: callers only re-send the latest one, while the
+        // live conversation still holds the earlier ones.
+        conversation?.takeIf { conversationHistory == prior.withoutImages() && conversationTools == tools }?.let { return it }
         conversation?.let { runCatching { it.close() } }
         conversation = null
         val system = prior.firstOrNull { it.role == Role.SYSTEM }?.text
@@ -150,10 +159,12 @@ class LiteRtEngine private constructor(
             ),
         ).also {
             conversation = it
-            conversationHistory = prior
+            conversationHistory = prior.withoutImages()
             conversationTools = tools
         }
     }
+
+    private fun List<ChatMessage>.withoutImages() = map { if (it.image == null) it else it.copy(image = null) }
 
     override fun close() {
         conversation?.let { runCatching { it.close() } }
@@ -165,13 +176,18 @@ class LiteRtEngine private constructor(
         private const val TAG = "LiteRtEngine"
         private const val CANCEL_WAIT_MS = 3_000L
 
-        /** Loads on [backend]; the caller decides what to fall back to when that fails. */
-        fun load(model: File, cacheDir: File, backend: Backend, contextSize: Int): LiteRtEngine {
+        /**
+         * Loads on [backend]; the caller decides what to fall back to when that fails. A
+         * [visionBackend] also loads the image encoder, which only multimodal models have.
+         */
+        fun load(model: File, cacheDir: File, backend: Backend, contextSize: Int, visionBackend: Backend?): LiteRtEngine {
             val engine = Engine(
                 EngineConfig(
                     modelPath = model.path,
                     backend = backend,
+                    visionBackend = visionBackend,
                     maxNumTokens = contextSize,
+                    maxNumImages = if (visionBackend != null) 1 else null,
                     cacheDir = cacheDir.path,
                 ),
             )
@@ -181,7 +197,7 @@ class LiteRtEngine private constructor(
                 runCatching { engine.close() }
                 throw e
             }
-            return LiteRtEngine(engine, backend.name)
+            return LiteRtEngine(engine, backend.name, supportsImages = visionBackend != null)
         }
     }
 }

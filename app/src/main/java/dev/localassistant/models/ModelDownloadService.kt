@@ -210,6 +210,7 @@ class ModelDownloadService : Service() {
         private const val EXTRA_SOURCE = "source"
 
         fun start(context: Context, file: RemoteModelFile) {
+            Transfers.remember(file.fileName, TransferSource.Model(file))
             Transfers.update(TransferState.Running(file.fileName, 0, file.sizeBytes))
             context.startForegroundService(
                 Intent(context, ModelDownloadService::class.java)
@@ -220,12 +221,20 @@ class ModelDownloadService : Service() {
         }
 
         fun startPack(context: Context, pack: VoicePack) {
+            Transfers.remember(pack.id, TransferSource.Pack(pack))
             Transfers.update(TransferState.Running(pack.id, 0, pack.approxBytes))
             context.startForegroundService(
                 Intent(context, ModelDownloadService::class.java)
                     .setAction(ACTION_PACK)
                     .putExtra(EXTRA_FILE_NAME, pack.id),
             )
+        }
+
+        /** Starts a failed download again; false when its origin is unknown (an import). */
+        fun retry(context: Context, fileName: String): Boolean = when (val source = Transfers.sourceOf(fileName)) {
+            is TransferSource.Model -> true.also { start(context, source.file) }
+            is TransferSource.Pack -> true.also { startPack(context, source.pack) }
+            null -> false
         }
 
         fun cancel(context: Context, fileName: String) {

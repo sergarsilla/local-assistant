@@ -23,14 +23,21 @@ import kotlinx.coroutines.withContext
 
 /**
  * A message as the panel shows it. [modelText] is what the model actually received, which can add
- * the current time or the text on screen to what the user typed or said.
+ * the current time or the text on screen to what the user typed or said; [image] is a screenshot
+ * sent with it.
  */
 data class UiMessage(
     val role: Role,
     val text: String,
     val streaming: Boolean = false,
     val modelText: String = text,
+    val image: ByteArray? = null,
+    /** True when what was on screen went to the model with this message. */
+    val withScreen: Boolean = false,
 )
+
+/** What was on screen, to send along with a question. */
+class ScreenAttachment(val text: String?, val image: ByteArray?)
 
 /** Receives the reply as it streams, e.g. to speak it aloud. */
 interface ReplyListener {
@@ -55,7 +62,7 @@ class ChatSession(
      * assistant session, which knows what was on screen and whether the user asked about it.
      */
     @Volatile
-    var screenFor: (question: String) -> String? = { null }
+    var screenFor: (question: String) -> ScreenAttachment? = { null }
 
     private var conversationId: Long? = null
     private val _messages = MutableStateFlow<List<UiMessage>>(emptyList())
@@ -82,13 +89,18 @@ class ChatSession(
         previous?.cancel()
         val myTurn = ++turn
         _generating.value = true
-        val modelText = decorate(prompt, screenFor(prompt))
+        val screen = screenFor(prompt)
+        val question = UiMessage(
+            role = Role.USER,
+            text = prompt,
+            modelText = decorate(prompt, screen),
+            image = screen?.image,
+            withScreen = screen != null,
+        )
         job = scope.launch {
             previous?.cancelAndJoin()
             _error.value = null
-            _messages.update {
-                it + UiMessage(Role.USER, prompt, modelText = modelText) + UiMessage(Role.ASSISTANT, "", streaming = true)
-            }
+            _messages.update { it + question + UiMessage(Role.ASSISTANT, "", streaming = true) }
             try {
                 persist(Role.USER, prompt)
                 holder.use { engine -> generateFitting(engine, listener) }
@@ -127,9 +139,23 @@ class ChatSession(
         conversationId = null
     }
 
+    /** Picks up a saved conversation where it was left; new turns are added to it. */
+    fun resume(id: Long) {
+        val store = history ?: return
+        stop()
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) { store.messages(id) }
+            _messages.value = saved
+                .filter { it.role == Role.USER || it.role == Role.ASSISTANT }
+                .map { UiMessage(it.role, it.text) }
+            _error.value = null
+            conversationId = id
+        }
+    }
+
     private suspend fun persist(role: Role, text: String) {
         val store = history ?: return
-        if (text.isBlank()) return
+        if (text.isBlank() || !store.enabled.value) return
         runCatching {
             withContext(Dispatchers.IO) {
                 synchronized(store) {
@@ -142,7 +168,13 @@ class ChatSession(
 
     /** Drops the oldest turns until the conversation fits the context window. */
     private suspend fun generateFitting(engine: LlmEngine, listener: ReplyListener?) {
-        val history = _messages.value.dropLast(1).map { ChatMessage(it.role, it.modelText) }
+        // Only the latest question carries its screenshot: images are large to re-send and the
+        // live conversation already holds the earlier ones.
+        val shown = _messages.value.dropLast(1)
+        val history = shown.mapIndexed { index, message ->
+            val image = message.image?.takeIf { index == shown.lastIndex && engine.supportsImages }
+            ChatMessage(message.role, message.modelText, image = image)
+        }
         var skip = 0
         while (true) {
             val window = listOf(systemMessage()) + history.drop(skip)
@@ -216,12 +248,16 @@ class ChatSession(
      * The clock goes with each question rather than in the system prompt: the system prompt then
      * never changes, so both engines can keep it processed between questions.
      */
-    private fun decorate(question: String, screenText: String?): String = buildString {
+    private fun decorate(question: String, screen: ScreenAttachment?): String = buildString {
+        val screenText = screen?.text
         append('[')
         append(SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()))
         append(" ")
         append(TimeZone.getDefault().id)
         appendLine("]")
+        if (screenText.isNullOrBlank() && screen?.image != null) {
+            appendLine("(A screenshot of the user's screen is attached.)")
+        }
         if (!screenText.isNullOrBlank()) {
             appendLine("Text on the user's screen:")
             appendLine("<<<")

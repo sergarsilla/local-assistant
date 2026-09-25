@@ -22,6 +22,17 @@ data class ConversationSummary(
  * rows and `VACUUM` rewrites the file so nothing survives in free pages.
  */
 class ConversationStore(context: Context) {
+    private val prefs = context.getSharedPreferences("history", Context.MODE_PRIVATE)
+    private val _enabled = MutableStateFlow(prefs.getBoolean(KEY_ENABLED, true))
+
+    /** When off, new conversations are not written anywhere; existing ones stay until deleted. */
+    val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
+
+    fun setEnabled(value: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLED, value).apply()
+        _enabled.value = value
+    }
+
     private val helper = object : SQLiteOpenHelper(context, "conversations.db", null, 1) {
         override fun onConfigure(db: SQLiteDatabase) {
             // A PRAGMA returns a row, so execSQL refuses it; rawQuery is the way to set it.
@@ -145,5 +156,6 @@ class ConversationStore(context: Context) {
 
     private companion object {
         const val TITLE_CHARS = 80
+        const val KEY_ENABLED = "enabled"
     }
 }

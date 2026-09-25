@@ -47,4 +47,7 @@ object Catalog {
             RemoteModelFile("unsloth/Qwen3-4B-Instruct-2507-GGUF", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf", 2_500_000_000),
         ),
     )
+
+    /** What first-run setup downloads: fast, good in Spanish and English, and able to use tools. */
+    val default: CatalogEntry get() = recommended.first()
 }

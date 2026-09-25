@@ -24,12 +24,33 @@ sealed interface EngineState {
     data object NoModel : EngineState
     data object Idle : EngineState
     data class Loading(val model: String) : EngineState
-    data class Ready(val model: String, val loadMillis: Long, val backend: String = "CPU") : EngineState
+    data class Ready(
+        val model: String,
+        val loadMillis: Long,
+        val backend: String = "CPU",
+        val readsImages: Boolean = false,
+    ) : EngineState
     data class Failed(val model: String, val message: String) : EngineState
 }
 
-/** What the user chose for acceleration, and whether the GPU turned out to be unusable. */
-data class AccelerationState(val useGpu: Boolean, val gpuBroken: Boolean)
+/** Where LiteRT-LM models run. GGUF models always use the CPU. */
+enum class Accelerator {
+    /** The GPU, falling back to the CPU. */
+    AUTO,
+    CPU,
+
+    /** Experimental: the Tensor NPU, which needs models compiled for it; falls back like [AUTO]. */
+    NPU,
+}
+
+/** How models are loaded, and which accelerators turned out to be unusable on this phone. */
+data class EnginePreferences(
+    val accelerator: Accelerator = Accelerator.AUTO,
+    val gpuBroken: Boolean = false,
+    val npuBroken: Boolean = false,
+    /** Loads the vision encoder too, so screenshots can be understood; costs memory. */
+    val understandImages: Boolean = false,
+)
 
 /**
  * Keeps at most one model in memory: loaded when the assistant opens and released shortly after
@@ -59,8 +80,8 @@ class EngineHolder(
     private val _state = MutableStateFlow<EngineState>(EngineState.Idle)
     val state: StateFlow<EngineState> = _state.asStateFlow()
 
-    private val _acceleration = MutableStateFlow(readAcceleration())
-    val acceleration: StateFlow<AccelerationState> = _acceleration.asStateFlow()
+    private val _preferences = MutableStateFlow(readPreferences())
+    val preferences: StateFlow<EnginePreferences> = _preferences.asStateFlow()
 
     /**
      * Loads the model and processes the fixed start of the prompt while the user is still
@@ -102,7 +123,7 @@ class EngineHolder(
         val elapsed = System.currentTimeMillis() - started
         Log.i(TAG, "Loaded ${model.name} on ${engine.backendName} in ${elapsed}ms")
         loaded = model.name to engine
-        _state.value = EngineState.Ready(model.name, elapsed, engine.backendName)
+        _state.value = EngineState.Ready(model.name, elapsed, engine.backendName, engine.supportsImages)
         engine
     }
 
@@ -120,10 +141,20 @@ class EngineHolder(
         scope.launch { useMutex.withLock { stateMutex.withLock { unloadLocked() } } }
     }
 
-    fun setUseGpu(enabled: Boolean) {
-        // Turning it on again is also how the user retries after a crash was detected.
-        prefs.edit().putBoolean(KEY_USE_GPU, enabled).putBoolean(KEY_GPU_BROKEN, false).apply()
-        _acceleration.value = AccelerationState(useGpu = enabled, gpuBroken = false)
+    /** Choosing an accelerator again is also how the user retries one that crashed before. */
+    fun setAccelerator(accelerator: Accelerator) {
+        prefs.edit()
+            .putString(KEY_ACCELERATOR, accelerator.name)
+            .putBoolean(KEY_GPU_BROKEN, false)
+            .putBoolean(KEY_NPU_BROKEN, false)
+            .apply()
+        _preferences.value = _preferences.value.copy(accelerator = accelerator, gpuBroken = false, npuBroken = false)
+        releaseNow()
+    }
+
+    fun setUnderstandImages(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_IMAGES, enabled).apply()
+        _preferences.value = _preferences.value.copy(understandImages = enabled)
         releaseNow()
     }
 
@@ -152,42 +183,73 @@ class EngineHolder(
     }
 
     /**
-     * The GPU decodes Gemma 4 E2B more than twice as fast as the CPU, but GPU drivers can also
-     * kill the process outright instead of reporting an error. A marker written before the attempt
-     * and removed after it tells the next start that the GPU crashed us, and it is not tried again
-     * until the user asks for it.
+     * The GPU decodes Gemma 4 E2B more than twice as fast as the CPU, but GPU and NPU drivers can
+     * also kill the process outright instead of reporting an error. A marker naming the backend
+     * is written before each attempt and removed after it; if it is still there on the next
+     * start, that backend crashed us and is not tried again until the user picks it anew.
      */
     private fun loadLiteRt(model: InstalledModel): LlmEngine {
         val cache = File(context.cacheDir, "litertlm").apply { mkdirs() }
-        val acceleration = _acceleration.value
-        if (acceleration.useGpu && !acceleration.gpuBroken) {
-            prefs.edit().putBoolean(KEY_GPU_ATTEMPT, true).commit()
+        val preferences = _preferences.value
+        val candidates = buildList {
+            if (preferences.accelerator == Accelerator.NPU && !preferences.npuBroken) {
+                add(Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir))
+            }
+            if (preferences.accelerator != Accelerator.CPU && !preferences.gpuBroken) add(Backend.GPU())
+        }
+        for (backend in candidates) {
+            prefs.edit().putString(KEY_ATTEMPT, backend.name).commit()
             try {
-                return LiteRtEngine.load(model.file, cache, Backend.GPU(), CONTEXT_SIZE)
+                return loadLiteRtOn(model, cache, backend, preferences.understandImages)
             } catch (e: Throwable) {
-                Log.w(TAG, "GPU backend unavailable, using the CPU", e)
-                markGpuBroken()
+                Log.w(TAG, "${backend.name} backend unavailable", e)
+                markBroken(backend.name)
             } finally {
-                prefs.edit().remove(KEY_GPU_ATTEMPT).commit()
+                prefs.edit().remove(KEY_ATTEMPT).commit()
             }
         }
-        return LiteRtEngine.load(model.file, cache, Backend.CPU(threadCount = THREADS), CONTEXT_SIZE)
+        return loadLiteRtOn(model, cache, Backend.CPU(threadCount = THREADS), preferences.understandImages)
     }
 
-    private fun markGpuBroken() {
-        prefs.edit().putBoolean(KEY_GPU_BROKEN, true).apply()
-        _acceleration.value = _acceleration.value.copy(gpuBroken = true)
-    }
-
-    private fun readAcceleration(): AccelerationState {
-        if (prefs.getBoolean(KEY_GPU_ATTEMPT, false)) {
-            // The last GPU attempt never finished: the driver took the process down with it.
-            Log.w(TAG, "The previous GPU start crashed; staying on the CPU")
-            prefs.edit().remove(KEY_GPU_ATTEMPT).putBoolean(KEY_GPU_BROKEN, true).commit()
+    /** Models without a vision encoder refuse to load with one, so that is retried without. */
+    private fun loadLiteRtOn(model: InstalledModel, cache: File, backend: Backend, images: Boolean): LlmEngine {
+        if (images) {
+            try {
+                return LiteRtEngine.load(model.file, cache, backend, CONTEXT_SIZE, visionBackend = backend)
+            } catch (e: Throwable) {
+                Log.w(TAG, "${model.name} cannot read images on ${backend.name}; loading it for text only", e)
+            }
         }
-        return AccelerationState(
-            useGpu = prefs.getBoolean(KEY_USE_GPU, true),
+        return LiteRtEngine.load(model.file, cache, backend, CONTEXT_SIZE, visionBackend = null)
+    }
+
+    private fun markBroken(backend: String) {
+        when (backend) {
+            BACKEND_NPU -> {
+                prefs.edit().putBoolean(KEY_NPU_BROKEN, true).apply()
+                _preferences.value = _preferences.value.copy(npuBroken = true)
+            }
+            else -> {
+                prefs.edit().putBoolean(KEY_GPU_BROKEN, true).apply()
+                _preferences.value = _preferences.value.copy(gpuBroken = true)
+            }
+        }
+    }
+
+    private fun readPreferences(): EnginePreferences {
+        prefs.getString(KEY_ATTEMPT, null)?.let { crashed ->
+            // The last attempt on this backend never finished: the driver took the process down.
+            Log.w(TAG, "The previous start on $crashed crashed; it will not be tried again")
+            val key = if (crashed == BACKEND_NPU) KEY_NPU_BROKEN else KEY_GPU_BROKEN
+            prefs.edit().remove(KEY_ATTEMPT).putBoolean(key, true).commit()
+        }
+        return EnginePreferences(
+            accelerator = prefs.getString(KEY_ACCELERATOR, null)
+                ?.let { name -> Accelerator.entries.firstOrNull { it.name == name } }
+                ?: Accelerator.AUTO,
             gpuBroken = prefs.getBoolean(KEY_GPU_BROKEN, false),
+            npuBroken = prefs.getBoolean(KEY_NPU_BROKEN, false),
+            understandImages = prefs.getBoolean(KEY_IMAGES, false),
         )
     }
 
@@ -199,9 +261,12 @@ class EngineHolder(
         private const val THREADS = 4
         private const val RELEASE_DELAY_MS = 30_000L
         private const val MIN_TOKENS_FOR_SPEED = 16
-        private const val KEY_USE_GPU = "use_gpu"
+        private const val KEY_ACCELERATOR = "accelerator"
         private const val KEY_GPU_BROKEN = "gpu_broken"
-        private const val KEY_GPU_ATTEMPT = "gpu_attempt"
+        private const val KEY_NPU_BROKEN = "npu_broken"
+        private const val KEY_ATTEMPT = "backend_attempt"
+        private const val KEY_IMAGES = "understand_images"
+        private const val BACKEND_NPU = "NPU"
     }
 }
 

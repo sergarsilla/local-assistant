@@ -18,6 +18,8 @@ data class ChatMessage(
     val toolCalls: List<ToolCall> = emptyList(),
     /** Set on [Role.TOOL] messages: the tool that produced this result. */
     val toolName: String? = null,
+    /** A JPEG sent along with a user message, for engines that [LlmEngine.supportsImages]. */
+    val image: ByteArray? = null,
 )
 
 data class GenerationStats(
@@ -45,6 +47,9 @@ interface LlmEngine : AutoCloseable {
 
     /** Where the model runs, shown to the user: "CPU", "GPU"… */
     val backendName: String get() = "CPU"
+
+    /** True when the model was loaded with a vision encoder and reads [ChatMessage.image]. */
+    val supportsImages: Boolean get() = false
 
     /**
      * Processes the part of the prompt every conversation starts with (system prompt and tool

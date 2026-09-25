@@ -46,7 +46,10 @@ enum class VoicePack(
 
     val isKokoro: Boolean get() = "kokoro" in repo
 
-    fun directory(context: Context) = File(context.filesDir, "voice/$id")
+    /** Packs built from the same repository (the two Kokoro voices) share one directory. */
+    val storageId: String get() = if (isKokoro) KOKORO_STORAGE else id
+
+    fun directory(context: Context) = File(context.filesDir, "voice/$storageId")
 
     fun isInstalled(context: Context) = File(directory(context), COMPLETE_MARKER).exists()
 
@@ -64,6 +67,7 @@ enum class VoicePack(
 
     companion object {
         const val COMPLETE_MARKER = ".complete"
+        private const val KOKORO_STORAGE = "kokoro-multi-lang"
         /** Null for ids saved by an older version that no longer exist. */
         fun byId(id: String) = entries.firstOrNull { it.id == id }
         fun voicesFor(language: String) = entries.filter { it.kind == PackKind.TEXT_TO_SPEECH && it.language == language }
