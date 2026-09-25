@@ -65,6 +65,9 @@ class WakeWordService : Service() {
                     .getOrDefault(false)
                 if (heard) {
                     if (!AssistantService.open(wakeWord = true)) Log.i(TAG, "Heard the phrase, but this app is not the assistant")
+                    // Gives the panel time to take the microphone (and pause this loop) before the
+                    // spotter would open it again.
+                    delay(HANDOVER_DELAY_MS)
                 } else {
                     delay(RETRY_DELAY_MS)
                 }
@@ -111,6 +114,7 @@ class WakeWordService : Service() {
         private const val NOTIFICATION_ID = 2
         private const val ACTION_DISABLE = "disable"
         private const val RETRY_DELAY_MS = 2_000L
+        private const val HANDOVER_DELAY_MS = 1_500L
 
         /**
          * Starts listening if the user turned it on. Android only lets a microphone service start

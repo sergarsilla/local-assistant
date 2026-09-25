@@ -77,6 +77,9 @@ class ChatSession(
     private var job: Job? = null
     private var turn = 0
 
+    /** Loading a saved conversation; a question asked meanwhile waits for it. */
+    private var loading: Job? = null
+
     /**
      * Sends a question. If an answer is still being written it is stopped first, and the new
      * question waits for it to wind down instead of being dropped.
@@ -97,8 +100,10 @@ class ChatSession(
             image = screen?.image,
             withScreen = screen != null,
         )
+        val pendingLoad = loading
         job = scope.launch {
             previous?.cancelAndJoin()
+            pendingLoad?.join()
             _error.value = null
             _messages.update { it + question + UiMessage(Role.ASSISTANT, "", streaming = true) }
             try {
@@ -140,10 +145,11 @@ class ChatSession(
     }
 
     /** Picks up a saved conversation where it was left; new turns are added to it. */
+    @Synchronized
     fun resume(id: Long) {
         val store = history ?: return
         stop()
-        scope.launch {
+        loading = scope.launch {
             val saved = withContext(Dispatchers.IO) { store.messages(id) }
             _messages.value = saved
                 .filter { it.role == Role.USER || it.role == Role.ASSISTANT }
