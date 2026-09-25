@@ -56,7 +56,8 @@ class VoiceController(
     /** Called when the panel opens: gets the recognizer ready before the user speaks. */
     fun preload() {
         val prefs = settings.state.value
-        if (prefs.speechToText.isInstalled(context)) holder.preload(prefs.speechToText)
+        prefs.activeSpeechToText?.let(holder::preload)
+        if (prefs.speakReplies) speaker.preload(prefs.language)
     }
 
     fun toggleListening() = if (listenJob?.isActive == true) stopListening() else startListening()
@@ -64,14 +65,14 @@ class VoiceController(
     fun startListening() {
         speaker.stop()
         chat.stop()
+        val pack = readyPack() ?: return
         val prefs = settings.state.value
-        if (!ready()) return
         listenJob?.cancel()
         listenJob = scope.launch {
             _state.value = VoiceState.Preparing
             try {
                 // Load the recognizer while already recording, so the first words are not lost.
-                val stt = scope.launch { holder.acquire(prefs.speechToText) }
+                val stt = scope.launch { runCatching { holder.acquire(pack) } }
                 var utterance: ListenEvent.Utterance? = null
                 microphone.listen().collect { event ->
                     when (event) {
@@ -93,7 +94,7 @@ class VoiceController(
                 stt.join()
                 val started = System.currentTimeMillis()
                 captures?.save(captured.samples)
-                val text = holder.acquire(prefs.speechToText).transcribe(captured.samples, prefs.language)
+                val text = holder.transcribe(pack, captured.samples, prefs.language)
                 Log.i(TAG, "Heard '$text' in ${System.currentTimeMillis() - started}ms")
                 if (text.isNotBlank()) chat.send(text, spokenReplyListener())
             } catch (e: Exception) {
@@ -115,13 +116,13 @@ class VoiceController(
      * assistant talks without hearing itself.
      */
     fun startConversation() {
-        if (!ready()) return
+        val pack = readyPack() ?: return
         stopListening()
         _conversation.value = true
         val prefs = settings.state.value
         listenJob = scope.launch {
             try {
-                holder.preload(prefs.speechToText)
+                holder.preload(pack)
                 // When the reply ends, whatever the microphone was recording is the assistant's
                 // own voice, so that audio is thrown away before listening for the next turn.
                 launch {
@@ -137,7 +138,7 @@ class VoiceController(
                         }
                         ListenEvent.SpeechStarted ->
                             if (!speaker.speaking.value) _state.value = VoiceState.Listening(0f, hearingSpeech = true)
-                        is ListenEvent.Utterance -> handle(event, prefs)
+                        is ListenEvent.Utterance -> handle(event, pack, prefs)
                         ListenEvent.NoSpeech -> Log.i(TAG, "Conversation ended after a long silence")
                     }
                 }
@@ -162,7 +163,7 @@ class VoiceController(
     /** Sends a typed question but answers it out loud, as if it had been spoken. */
     fun ask(text: String) = chat.send(text, spokenReplyListener())
 
-    private suspend fun handle(utterance: ListenEvent.Utterance, prefs: VoicePreferences) {
+    private suspend fun handle(utterance: ListenEvent.Utterance, pack: VoicePack, prefs: VoicePreferences) {
         if (speaker.speaking.value) {
             // Recorded while the reply was audible, so it is the assistant's own voice.
             Log.i(TAG, "Dropped audio captured while speaking")
@@ -175,7 +176,7 @@ class VoiceController(
         }
         captures?.save(utterance.samples)
         _state.value = VoiceState.Transcribing
-        val text = holder.acquire(prefs.speechToText).transcribe(utterance.samples, prefs.language)
+        val text = holder.transcribe(pack, utterance.samples, prefs.language)
         Log.i(TAG, "Heard '$text' (${durationMs}ms, peak=${utterance.peakLevel})")
         if (text.isBlank() || echoes(text)) {
             // Last safety net: if the words repeat the reply, the cancellation let an echo through.
@@ -184,7 +185,7 @@ class VoiceController(
             return
         }
         speaker.stop()
-        chat.stop()
+        // send() stops the answer in progress and waits for it, so the new question is never lost.
         chat.send(text, spokenReplyListener())
     }
 
@@ -196,16 +197,16 @@ class VoiceController(
         return heard.count { it in spoken }.toFloat() / heard.size >= ECHO_WORD_RATIO
     }
 
-    private fun ready(): Boolean {
+    /** The recognizer to listen with, or null (and a state saying why) when voice cannot work yet. */
+    private fun readyPack(): VoicePack? {
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             _state.value = VoiceState.NeedsPermission
-            return false
+            return null
         }
-        if (!settings.state.value.speechToText.isInstalled(context)) {
+        return settings.state.value.activeSpeechToText ?: run {
             _state.value = VoiceState.NeedsModel
-            return false
+            null
         }
-        return true
     }
 
     fun stopListening() {

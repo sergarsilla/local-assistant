@@ -112,7 +112,7 @@ class BenchmarkActivity : Activity() {
         }
         intent.getStringExtra("tts")?.let { packId ->
             thread(name = "tts") {
-                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)) }
+                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)!!) }
                     .onFailure { report("FAILED tts $packId: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
@@ -130,11 +130,11 @@ class BenchmarkActivity : Activity() {
             return
         }
         intent.getStringExtra("stt")?.let { id ->
-            AssistantRuntime.voiceSettings.update { it.copy(speechToText = VoicePack.byId(id)) }
+            AssistantRuntime.voiceSettings.update { it.copy(speechToText = VoicePack.byId(id)!!) }
             return finishWith("speech recognizer set to $id")
         }
         intent.getStringExtra("pack")?.let { id ->
-            ModelDownloadService.startPack(this, VoicePack.byId(id))
+            ModelDownloadService.startPack(this, VoicePack.byId(id)!!)
             return finishWith("pack download started $id")
         }
         intent.getStringExtra("asr")?.let { engine ->

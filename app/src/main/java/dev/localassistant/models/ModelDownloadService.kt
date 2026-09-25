@@ -49,9 +49,14 @@ class ModelDownloadService : Service() {
                 stopIfIdle()
             }
             ACTION_PACK -> {
-                val pack = VoicePack.byId(fileName)
+                // Started with startForegroundService, so it must go foreground even to bail out.
                 startForeground(NOTIFICATION_ID, progressNotification(fileName, 0f),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                val pack = VoicePack.byId(fileName) ?: run {
+                    Transfers.clear(fileName)
+                    stopIfIdle()
+                    return START_NOT_STICKY
+                }
                 if (jobs[fileName]?.isActive != true) {
                     jobs[fileName] = scope.launch { downloadPack(pack) }
                 }

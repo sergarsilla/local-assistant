@@ -1,6 +1,8 @@
 package dev.localassistant.assistant
 
+import android.Manifest
 import android.content.ContextParams
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognitionService
@@ -30,8 +32,12 @@ class SpeechRecognitionService : RecognitionService() {
     private var stopRequested = MutableStateFlow(false)
 
     override fun onStartListening(recognizerIntent: Intent, listener: Callback) {
-        val pack = AssistantRuntime.voiceSettings.state.value.speechToText
-        if (!pack.isInstalled(this)) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.i(TAG, "The assistant has no microphone permission")
+            listener.error(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
+            return
+        }
+        val pack = AssistantRuntime.voiceSettings.state.value.activeSpeechToText ?: run {
             Log.i(TAG, "No speech model installed")
             listener.error(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
             return
@@ -62,7 +68,7 @@ class SpeechRecognitionService : RecognitionService() {
                     }
                 }
                 val samples = utterance ?: return@launch
-                val text = AssistantRuntime.speech.acquire(pack).transcribe(samples, language)
+                val text = AssistantRuntime.speech.transcribe(pack, samples, language)
                 if (text.isBlank()) {
                     listener.error(SpeechRecognizer.ERROR_NO_MATCH)
                 } else {

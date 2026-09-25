@@ -64,7 +64,8 @@ enum class VoicePack(
 
     companion object {
         const val COMPLETE_MARKER = ".complete"
-        fun byId(id: String) = entries.first { it.id == id }
+        /** Null for ids saved by an older version that no longer exist. */
+        fun byId(id: String) = entries.firstOrNull { it.id == id }
         fun voicesFor(language: String) = entries.filter { it.kind == PackKind.TEXT_TO_SPEECH && it.language == language }
     }
 }

@@ -5,12 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.util.Log
-import com.k2fsa.sherpa.onnx.OfflineTts
-import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
-import java.io.File
+import dev.localassistant.AssistantRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,10 +21,14 @@ import kotlinx.coroutines.launch
 /**
  * Speaks a reply while it is still being generated: text is cut into sentences, the next
  * sentence is synthesized while the current one plays, and [stop] silences it immediately.
+ *
+ * The voice is chosen from the first sentence: a reply in English gets an English voice even
+ * when the assistant is set to Spanish, as long as one is installed.
  */
 class Speaker(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val voices: TtsVoices = AssistantRuntime.ttsVoices,
     private val voiceFor: (String) -> VoicePack?,
 ) : AutoCloseable {
     /**
@@ -48,12 +47,10 @@ class Speaker(
             }
         }
 
-    private val voices = mutableMapOf<String, OfflineTts>()
     private var sentences = Channel<String>(Channel.UNLIMITED)
     private var job: Job? = null
     private var track: AudioTrack? = null
     private val pending = StringBuilder()
-
 
     private val _speaking = MutableStateFlow(false)
     val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
@@ -63,26 +60,41 @@ class Speaker(
     var spokenSoFar: String = ""
         private set
 
-    fun canSpeak(language: String) = packFor(language)?.isInstalled(context) == true
+    /** True when at least one voice is installed; [begin] picks the best one for the reply. */
+    fun canSpeak(language: String) =
+        installedVoice(language) != null || listOf("es", "en").any { installedVoice(it) != null }
+
+    /** Loads the voice for [language] ahead of the first reply. */
+    fun preload(language: String) {
+        installedVoice(language)?.let(voices::preload)
+    }
 
     /** Starts a new spoken reply, interrupting any previous one. */
     @Synchronized
     fun begin(language: String) {
         stop()
         spokenSoFar = ""
-        val pack = packFor(language)?.takeIf { it.isInstalled(context) } ?: return
+        if (!canSpeak(language)) return
         val queue = Channel<String>(Channel.UNLIMITED).also { sentences = it }
         val audio = Channel<FloatArray>(capacity = 2)
         _speaking.value = true
         val reply = scope.launch(Dispatchers.Default) {
-            val tts = synchronized(voices) { voices.getOrPut(pack.id) { load(pack) } }
-            val player = launch(Dispatchers.IO) { play(audio, tts.sampleRate()) }
-            for (sentence in queue) {
-                if (!isActive) break
-                val samples = tts.generate(sentence, sid = pack.speakerId).samples
-                if (samples.isNotEmpty()) audio.send(samples)
+            val first = queue.receiveCatching().getOrNull() ?: return@launch
+            val pack = LanguageGuess.of(first)?.let(::installedVoice)
+                ?: installedVoice(language)
+                ?: installedVoice(if (language == "es") "en" else "es")
+                ?: return@launch
+            val player = launch(Dispatchers.IO) { play(audio, voices.sampleRate(pack)) }
+            try {
+                var sentence: String? = first
+                while (sentence != null && isActive) {
+                    val samples = voices.synthesize(pack, sentence)
+                    if (samples.isNotEmpty()) audio.send(samples)
+                    sentence = queue.receiveCatching().getOrNull()
+                }
+            } finally {
+                audio.close()
             }
-            audio.close()
             player.join()
         }
         job = reply
@@ -124,13 +136,17 @@ class Speaker(
         _speaking.value = false
     }
 
+    /** Frees this panel's audio; the voices themselves stay cached for the next panel. */
     override fun close() {
         stop()
-        voices.values.forEach { it.release() }
-        voices.clear()
-        track?.release()
-        track = null
+        synchronized(this) {
+            track?.release()
+            track = null
+        }
+        voices.scheduleRelease()
     }
+
+    private fun installedVoice(language: String) = voiceFor(language)?.takeIf { it.isInstalled(context) }
 
     private fun enqueue(text: String) {
         val clean = speakable(text)
@@ -140,12 +156,8 @@ class Speaker(
         }
     }
 
-    /**
-     * Silences playback at once while checking whether the user really is talking over the reply.
-     * Pausing keeps the audio already queued, so [resume] continues exactly where it stopped.
-     */
     private suspend fun play(audio: Channel<FloatArray>, sampleRate: Int) {
-        val out = trackFor(sampleRate)
+        val out = synchronized(this) { trackFor(sampleRate) }
         out.play()
         val startedAt = System.currentTimeMillis()
         var frames = 0
@@ -159,13 +171,13 @@ class Speaker(
             frames += samples.size
         }
         // The device's playback head counter is unreliable here, so wait out the audio's own
-        // duration instead, ignoring the time spent paused for interruption checks.
+        // duration instead.
         val audioMs = frames * 1000L / sampleRate
         while (currentCoroutineContext().isActive && System.currentTimeMillis() - startedAt < audioMs) {
             delay(DRAIN_POLL_MS)
         }
         Log.i(TAG, "Spoke ${audioMs}ms of audio")
-        out.stop()
+        runCatching { out.stop() }
     }
 
     private fun trackFor(sampleRate: Int): AudioTrack {
@@ -193,35 +205,10 @@ class Speaker(
             .also { track = it }
     }
 
-    private fun load(pack: VoicePack): OfflineTts {
-        val dir = pack.directory(context)
-        val model = if (pack.isKokoro) {
-            OfflineTtsModelConfig(
-                kokoro = OfflineTtsKokoroModelConfig(
-                    model = File(dir, "model.int8.onnx").path,
-                    voices = File(dir, "voices.bin").path,
-                    tokens = File(dir, "tokens.txt").path,
-                    dataDir = File(dir, "espeak-ng-data").path,
-                    lexicon = File(dir, "lexicon-us-en.txt").path,
-                    lang = pack.language.orEmpty(),
-                ),
-            )
-        } else {
-            OfflineTtsModelConfig(
-                vits = OfflineTtsVitsModelConfig(
-                    model = dir.listFiles { f -> f.name.endsWith(".onnx") }.orEmpty().first().path,
-                    tokens = File(dir, "tokens.txt").path,
-                    dataDir = File(dir, "espeak-ng-data").path,
-                ),
-            )
-        }
-        return OfflineTts(config = OfflineTtsConfig(model = model.apply { numThreads = 2 }))
-    }
-
-    private fun packFor(language: String) = voiceFor(language)
-
-    /** Drops markdown and symbols that a voice would read out literally. */
+    /** Drops markdown, links and symbols that a voice would read out literally. */
     private fun speakable(text: String) = text
+        .replace(Regex("\\[([^\\]]+)]\\([^)]+\\)"), "$1")
+        .replace(Regex("https?://\\S+"), "")
         .replace(Regex("[*_`#>|]"), " ")
         .replace(Regex("^\\s*[-•]\\s+", RegexOption.MULTILINE), "")
         .replace(Regex("[\\p{So}\\p{Cn}]"), "")
@@ -231,7 +218,7 @@ class Speaker(
     private companion object {
         const val TAG = "Speaker"
         const val DRAIN_POLL_MS = 50L
-        const val DRAIN_STALL_LIMIT_MS = 300L
+
         // A sentence ends at . ! ? : ; or a newline followed by whitespace, not inside numbers like 3.5.
         val SENTENCE_END = Regex("(?<!\\d)[.!?;:](?=\\s)|\\n")
     }
