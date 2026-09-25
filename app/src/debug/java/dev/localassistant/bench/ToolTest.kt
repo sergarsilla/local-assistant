@@ -24,7 +24,7 @@ class ToolTest(private val context: Context, private val report: (String) -> Uni
             SystemClock.sleep(100)
         }
         report("TOOL question='$question' took=${SystemClock.elapsedRealtime() - start}ms tool=$seenTool")
-        report("TOOL pending_action=${AssistantRuntime.tools.actions.pending.value?.label}")
+        report("TOOL pending_action=${AssistantRuntime.tools.actions.pending.value?.detail}")
         report("TOOL reply='${chat.messages.value.lastOrNull()?.text?.replace('\n', ' ')?.take(300)}'")
         AssistantRuntime.tools.actions.clear()
     }

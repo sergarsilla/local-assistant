@@ -18,8 +18,11 @@ fun interface ActivityLauncher {
     fun launch(intent: Intent, leavesPanel: Boolean)
 }
 
+/** What a proposed action does, so the panel can phrase its question and pick an icon. */
+enum class ActionKind { MESSAGE, CALENDAR_EVENT }
+
 /** An action the model proposed; it only runs when the user taps it. */
-data class PendingAction(val label: String, val intent: Intent)
+data class PendingAction(val kind: ActionKind, val detail: String, val intent: Intent)
 
 /** Holds the action waiting for confirmation in the panel. */
 class ActionQueue {
@@ -113,19 +116,16 @@ class OpenAppTool(
     """.trimIndent()
 
     override fun run(arguments: JSONObject): String {
-        val wanted = normalize(arguments.optString("name"))
-        if (wanted.isEmpty()) return JSONObject().put("error", "missing name").toString()
+        if (AppMatcher.normalize(arguments.optString("name")).isEmpty()) {
+            return JSONObject().put("error", "missing name").toString()
+        }
         listener.onToolStarted(name, arguments.optString("name"))
         val packages = context.packageManager
         val installed = packages
             .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
             .map { it.activityInfo.packageName to packages.getApplicationLabel(it.activityInfo.applicationInfo).toString() }
             .distinctBy { it.first }
-        val match = installed
-            .map { it to score(normalize(it.second), it.first, wanted) }
-            .filter { (_, score) -> score < Int.MAX_VALUE }
-            .minByOrNull { (_, score) -> score }
-            ?.first
+        val match = AppMatcher.best(arguments.optString("name"), installed)
             // The model may use another language for the app name, so it gets the real list to retry.
             ?: return JSONObject()
                 .put("error", "app not found")
@@ -134,6 +134,29 @@ class OpenAppTool(
         val intent = packages.getLaunchIntentForPackage(match.first)
             ?: return JSONObject().put("error", "app cannot be opened").toString()
         return start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}")
+    }
+
+    private companion object {
+        const val MAX_LISTED_APPS = 40
+    }
+}
+
+/** Finds the installed app a spoken name refers to. */
+object AppMatcher {
+    private const val STEM_LENGTH = 5
+    private const val MIN_WORD = 3
+    private const val WORD_WEIGHT = 10
+    private const val PACKAGE_ONLY = 100
+
+    /** The best match among (package, label) pairs, or null when nothing plausible is installed. */
+    fun best(name: String, apps: List<Pair<String, String>>): Pair<String, String>? {
+        val wanted = normalize(name)
+        if (wanted.isEmpty()) return null
+        return apps
+            .map { it to score(normalize(it.second), it.first, wanted) }
+            .filter { (_, score) -> score < Int.MAX_VALUE }
+            .minByOrNull { (_, score) -> score }
+            ?.first
     }
 
     /**
@@ -150,7 +173,7 @@ class OpenAppTool(
         val matched = wantedWords.count { word ->
             labelWords.any { sharedPrefix(it, word) >= minOf(STEM_LENGTH, word.length, it.length) }
         }
-        if (matched == 0) return if (wanted in packageName) MAX_SCORE else Int.MAX_VALUE
+        if (matched == 0) return if (wanted in packageName) PACKAGE_ONLY else Int.MAX_VALUE
         return (wantedWords.size - matched) * WORD_WEIGHT + (labelWords.size - matched) + 1
     }
 
@@ -161,16 +184,9 @@ class OpenAppTool(
         return i
     }
 
-    private companion object {
-        const val STEM_LENGTH = 5
-        const val MIN_WORD = 3
-        const val WORD_WEIGHT = 10
-        const val MAX_SCORE = 100
-        const val MAX_LISTED_APPS = 40
-    }
-
-    private fun normalize(text: String) = java.text.Normalizer.normalize(text.lowercase().trim(), java.text.Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
+    fun normalize(text: String) =
+        java.text.Normalizer.normalize(text.lowercase().trim(), java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"), "")
 }
 
 /** Calendar entries and messages are only prepared; the user confirms them in the panel. */
@@ -203,7 +219,7 @@ class CalendarTool(
             .putExtra(CalendarContract.Events.TITLE, title)
             .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, start)
             .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, start + minutes * 60_000L)
-        queue.propose(PendingAction("$title · $date $time", intent))
+        queue.propose(PendingAction(ActionKind.CALENDAR_EVENT, "$title · $date $time", intent))
         return JSONObject().put("status", "waiting for the user to confirm").toString()
     }
 
@@ -223,6 +239,7 @@ class CalendarTool(
 
 class SendMessageTool(
     private val queue: ActionQueue,
+    private val contacts: ContactsDirectory,
     private val listener: ToolActivityListener,
 ) : AssistantTool {
     override val name = "send_message"
@@ -231,25 +248,87 @@ class SendMessageTool(
         {"name":"send_message",
          "description":"Prepare a text message for the user to confirm.",
          "parameters":{"type":"object","properties":{
-           "recipient":{"type":"string"},
+           "recipient":{"type":"string","description":"Contact name or phone number."},
            "text":{"type":"string"}},
           "required":["recipient","text"]}}
     """.trimIndent()
 
     override fun run(arguments: JSONObject): String {
-        val recipient = arguments.optString("recipient").ifBlank {
-            return JSONObject().put("error", "missing recipient").toString()
-        }
-        val text = arguments.optString("text").ifBlank {
-            return JSONObject().put("error", "missing text").toString()
-        }
+        val recipient = arguments.optString("recipient").ifBlank { return error("missing recipient") }
+        val text = arguments.optString("text").ifBlank { return error("missing text") }
         listener.onToolStarted(name, recipient)
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(recipient)}"))
+        val number = when (val resolved = resolveRecipient(recipient, contacts)) {
+            is Recipient.Found -> resolved.contact.number
+            is Recipient.Unresolved -> return resolved.json
+            // Without the permission the messaging app asks who to send it to.
+            Recipient.NoPermission -> ""
+        }
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(number)}"))
             .putExtra("sms_body", text)
-        queue.propose(PendingAction("$recipient: $text", intent))
+        queue.propose(PendingAction(ActionKind.MESSAGE, "$recipient: $text", intent))
         return JSONObject().put("status", "waiting for the user to confirm").toString()
     }
 }
+
+/** Opens the dialer with the number filled in; the call starts only when the user taps it. */
+class CallTool(
+    private val launcher: ActivityLauncher,
+    private val contacts: ContactsDirectory,
+    private val listener: ToolActivityListener,
+) : AssistantTool {
+    override val name = "call_contact"
+
+    override fun describe() = """
+        {"name":"call_contact",
+         "description":"Open the dialer to call a contact or number.",
+         "parameters":{"type":"object","properties":{
+           "recipient":{"type":"string","description":"Contact name or phone number."}},
+          "required":["recipient"]}}
+    """.trimIndent()
+
+    override fun run(arguments: JSONObject): String {
+        val recipient = arguments.optString("recipient").ifBlank { return error("missing recipient") }
+        listener.onToolStarted(name, recipient)
+        val contact = when (val resolved = resolveRecipient(recipient, contacts)) {
+            is Recipient.Found -> resolved.contact
+            is Recipient.Unresolved -> return resolved.json
+            Recipient.NoPermission -> return error("contacts permission not granted; ask for a phone number")
+        }
+        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(contact.number)}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return start(launcher, intent, "dialer opened for ${contact.name}; the user taps to call")
+    }
+}
+
+private sealed interface Recipient {
+    data class Found(val contact: Contact) : Recipient
+    data class Unresolved(val json: String) : Recipient
+    data object NoPermission : Recipient
+}
+
+/**
+ * Turns what the model wrote into a phone number. Several matches go back to the model so it can
+ * ask which one; guessing would message the wrong person.
+ */
+private fun resolveRecipient(recipient: String, contacts: ContactsDirectory): Recipient {
+    if (ContactMatcher.looksLikeNumber(recipient)) return Recipient.Found(Contact(recipient, recipient))
+    if (!contacts.hasPermission()) return Recipient.NoPermission
+    val matches = contacts.find(recipient)
+    return when (matches.size) {
+        0 -> Recipient.Unresolved(error("no contact matches '$recipient'"))
+        1 -> Recipient.Found(matches.single())
+        else -> Recipient.Unresolved(
+            JSONObject()
+                .put("error", "several contacts match; ask the user which one")
+                .put("candidates", JSONArray(matches.take(MAX_CANDIDATES).map { it.name }))
+                .toString(),
+        )
+    }
+}
+
+private const val MAX_CANDIDATES = 5
+
+private fun error(message: String) = JSONObject().put("error", message).toString()
 
 /** Navigation and places go to whichever maps app the phone has, Google's or not. */
 class MapsTool(

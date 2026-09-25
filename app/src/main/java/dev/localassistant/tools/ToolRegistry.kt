@@ -43,13 +43,16 @@ class ToolRegistry(private val context: Context) {
             ?: context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    private val contacts = ContactsDirectory(context)
+
     private val onDevice = listOf(
         TimerTool(launcher, listener),
         AlarmTool(launcher, listener),
         OpenAppTool(context, launcher, listener),
         MapsTool(context, launcher, listener),
         CalendarTool(actions, listener),
-        SendMessageTool(actions, listener),
+        SendMessageTool(actions, contacts, listener),
+        CallTool(launcher, contacts, listener),
     )
     private val online = listOf(WebSearchTool(listener), ReadPageTool(listener))
 
