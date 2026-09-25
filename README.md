@@ -11,18 +11,23 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Opens as the system assistant.** Implements `VoiceInteractionService`, so the usual assistant
   gesture (corner swipe, power button, whatever the phone is set to) brings up a panel on top of
   the current app. First frame in ~45 ms.
-- **Runs your own models.** GGUF through llama.cpp and `.litertlm` through LiteRT-LM. Download
-  them from Hugging Face inside the app, or import a file. Gemma 4 E2B answers at ~20 tokens/s on
-  a Tensor G5.
+- **Runs your own models.** GGUF through llama.cpp and `.litertlm` through LiteRT-LM, which uses
+  the GPU when the phone allows it and falls back to the CPU. Download them from Hugging Face
+  inside the app, or import a file. Gemma 4 E2B answers at ~20 tokens/s on the Tensor G5's CPU.
+  The system prompt and tool definitions are processed while you are still speaking.
 - **Speech in and out.** Offline recognition (NVIDIA Parakeet or Canary via sherpa-onnx) and
   offline synthesis (Piper or Kokoro voices), with a conversation mode that keeps listening
-  between turns.
+  between turns. Replies are spoken with a voice of their own language.
+- **Offline dictation for the whole phone.** As the assistant it is also the system recognizer,
+  and it answers the microphone button of other apps (`ACTION_RECOGNIZE_SPEECH`), which nothing
+  handles on GrapheneOS without Google's app.
 - **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events and
   text messages. Anything that sends or creates something waits for an explicit confirmation.
-- **Searches the web when asked.** The model can call a search tool and read pages as text; no
-  browser is opened. Remove the network permission and everything else still works.
-- **Reads the screen on request.** Only when Android's "use text from screen" is enabled and only
-  when you tap the chip.
+- **Searches the web only if you turn it on.** Off by default. When enabled, the model can query
+  DuckDuckGo and read public HTTPS pages as text; no browser is opened. Remove the network
+  permission and everything else still works.
+- **Reads the screen on request.** Only when Android's "use text from screen" is enabled, and only
+  when you tap the chip or ask about the screen ("summarise this").
 - **Keeps history on the phone.** Conversations are stored in SQLite with `secure_delete`, and
   deleting one rewrites the database file so the text is really gone.
 - **Costs nothing when idle.** The model is released a few seconds after the panel closes:
@@ -45,12 +50,15 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Then open the app, choose it as the digital assistant in Android's settings, and download a model
-from the Models tab. LiteRT-LM models are the ones that can use tools and web search.
+from the Models tab. Both GGUF and LiteRT-LM models can use the phone actions.
+
+`docs/ESTADO.md` has the current review: what works, what was fixed, what is next and how to
+verify it on the phone.
 
 ## Privacy
 
 The app has no analytics and no server. The network permission is used only for the model
-searches and downloads you start yourself, and for the web-search tool. Speech, text and history
+searches and downloads you start yourself, and for the web-search tool once you enable it. Speech, text and history
 never leave the device.
 
 ## Licence
