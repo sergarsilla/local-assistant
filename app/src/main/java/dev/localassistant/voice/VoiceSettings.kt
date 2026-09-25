@@ -16,6 +16,8 @@ data class VoicePreferences(
     val speakReplies: Boolean,
     val language: String,
     val voices: Map<String, VoicePack>,
+    /** The voice keyboard starts listening as soon as it appears. */
+    val keyboardListensOnOpen: Boolean = true,
 ) {
     /** The recognizer to use: the chosen one if installed, otherwise any installed one. */
     val activeSpeechToText: VoicePack?
@@ -52,6 +54,7 @@ class VoiceSettings(private val context: Context) {
             .putString(KEY_LANGUAGE, next.language)
             .putString(KEY_VOICE_ES, next.voices["es"]?.id)
             .putString(KEY_VOICE_EN, next.voices["en"]?.id)
+            .putBoolean(KEY_KEYBOARD_LISTENS, next.keyboardListensOnOpen)
             .apply()
         _state.value = next
     }
@@ -64,6 +67,7 @@ class VoiceSettings(private val context: Context) {
         voices = mapOf("es" to KEY_VOICE_ES, "en" to KEY_VOICE_EN).mapNotNull { (language, key) ->
             prefs.getString(key, null)?.let(VoicePack::byId)?.let { language to it }
         }.toMap(),
+        keyboardListensOnOpen = prefs.getBoolean(KEY_KEYBOARD_LISTENS, true),
     )
 
     private fun defaultLanguage() = if (Locale.getDefault().language == "en") "en" else "es"
@@ -75,5 +79,6 @@ class VoiceSettings(private val context: Context) {
         const val KEY_LANGUAGE = "language"
         const val KEY_VOICE_ES = "voice_es"
         const val KEY_VOICE_EN = "voice_en"
+        const val KEY_KEYBOARD_LISTENS = "keyboard_listens_on_open"
     }
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "voice" mode lets keyboards with a microphone key (HeliBoard, FUTO…) switch to this one. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.localassistant.ui.MainActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:imeSubtypeMode="voice"
+        android:label="@string/keyboard_subtype_es"
+        android:languageTag="es-ES" />
+    <subtype
+        android:imeSubtypeMode="voice"
+        android:label="@string/keyboard_subtype_en"
+        android:languageTag="en-US" />
+</input-method>

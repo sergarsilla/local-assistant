@@ -1,53 +1,80 @@
 package dev.localassistant.assistant
 
-import android.Manifest
-import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
-import android.util.Log
-import android.view.Gravity
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ProgressBar
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.localassistant.AssistantRuntime
 import dev.localassistant.R
-import dev.localassistant.voice.ListenEvent
-import dev.localassistant.voice.Microphone
+import dev.localassistant.ui.MainActivity
+import dev.localassistant.ui.dictation.DictationPanel
+import dev.localassistant.ui.navigation.Destination
+import dev.localassistant.ui.theme.AssistantTheme
+import dev.localassistant.ui.theme.Spacing
+import dev.localassistant.voice.Dictation
+import dev.localassistant.voice.DictationState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 /**
  * Answers `RecognizerIntent.ACTION_RECOGNIZE_SPEECH`, the intent behind the microphone button in
  * search bars, maps and note apps. Without Google's app nothing on GrapheneOS handles it, so those
- * buttons do nothing; this small dialog gives them the same offline recognizer as the assistant.
+ * buttons do nothing; this sheet gives them the same offline recognizer as the assistant.
  */
-class RecognizeSpeechActivity : Activity() {
+class RecognizeSpeechActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val stop = MutableStateFlow(false)
-    private lateinit var status: TextView
-    private lateinit var level: ProgressBar
+    private lateinit var dictation: Dictation
+
+    private val askMic = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) listen() else finishWith(null)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setFinishOnTouchOutside(true)
-        setContentView(layout())
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            listen()
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MIC)
+        dictation = Dictation(this, scope, AssistantRuntime.speech, AssistantRuntime.voiceSettings)
+        setContent {
+            AssistantTheme {
+                val state by dictation.state.collectAsState()
+                DictationSheet(
+                    state = state,
+                    onMicClick = {
+                        if (state is DictationState.Listening) dictation.finishSpeaking() else listen()
+                    },
+                    onFixSetup = {
+                        startActivity(MainActivity.intent(this, Destination.SETTINGS))
+                        finishWith(null)
+                    },
+                    onCancel = { finishWith(null) },
+                )
+            }
         }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) listen() else finishWith(null)
+        if (savedInstanceState == null) listen()
     }
 
     override fun onDestroy() {
@@ -56,42 +83,15 @@ class RecognizeSpeechActivity : Activity() {
     }
 
     private fun listen() {
-        val prefs = AssistantRuntime.voiceSettings.state.value
-        val pack = prefs.activeSpeechToText ?: run {
-            status.setText(R.string.dictation_no_model)
-            return
-        }
         val language = intent.getStringExtra(RecognizerIntent.EXTRA_LANGUAGE)
-            ?.substringBefore('-')?.substringBefore('_')
-            ?: prefs.language
-        AssistantRuntime.speech.preload(pack)
-        scope.launch {
-            try {
-                var samples: FloatArray? = null
-                Microphone(this@RecognizeSpeechActivity).listen(stopRequested = stop).collect { event ->
-                    when (event) {
-                        is ListenEvent.Level -> level.progress = (event.rms * LEVEL_GAIN * 100).toInt().coerceIn(2, 100)
-                        ListenEvent.SpeechStarted -> status.setText(R.string.panel_hearing)
-                        is ListenEvent.Utterance -> samples = event.samples
-                        ListenEvent.NoSpeech -> Unit
-                    }
-                }
-                val captured = samples ?: return@launch finishWith(null)
-                status.setText(R.string.panel_transcribing)
-                level.isIndeterminate = true
-                val text = AssistantRuntime.speech.transcribe(pack, captured, language)
-                finishWith(text.takeIf { it.isNotBlank() })
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                Log.w(TAG, "Dictation failed", e)
-                finishWith(null)
-            } finally {
-                AssistantRuntime.speech.scheduleRelease()
-            }
+        dictation.start(language) { text -> finishWith(text) }
+        if (dictation.state.value == DictationState.NeedsPermission) {
+            askMic.launch(android.Manifest.permission.RECORD_AUDIO)
         }
     }
 
     private fun finishWith(text: String?) {
+        dictation.cancel()
         if (text == null) {
             setResult(RESULT_CANCELED)
         } else {
@@ -104,32 +104,46 @@ class RecognizeSpeechActivity : Activity() {
         }
         finish()
     }
+}
 
-    private fun layout(): LinearLayout {
-        val padding = (24 * resources.displayMetrics.density).toInt()
-        status = TextView(this).apply {
-            setText(R.string.panel_listening)
-            textSize = 20f
-            gravity = Gravity.CENTER
+@androidx.compose.runtime.Composable
+private fun DictationSheet(
+    state: DictationState,
+    onMicClick: () -> Unit,
+    onFixSetup: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.32f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onCancel),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+        ) {
+            Column(
+                Modifier.navigationBarsPadding().padding(Spacing.xl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    stringResource(R.string.dictation_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                DictationPanel(
+                    state = state,
+                    onMicClick = onMicClick,
+                    onFixSetup = onFixSetup,
+                    modifier = Modifier.padding(vertical = Spacing.l),
+                )
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            }
         }
-        level = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
-        val done = Button(this).apply {
-            setText(R.string.dictation_done)
-            // Ends the utterance now instead of waiting for the trailing silence.
-            setOnClickListener { stop.value = true }
-        }
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, padding)
-            addView(status)
-            addView(level)
-            addView(done)
-        }
-    }
-
-    private companion object {
-        const val TAG = "RecognizeSpeech"
-        const val REQUEST_MIC = 1
-        const val LEVEL_GAIN = 6f
     }
 }
