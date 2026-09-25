@@ -11,6 +11,8 @@ data class Contact(val name: String, val number: String)
 /** Picks the contacts a spoken name refers to: "mamá", "Ana García", "el fontanero"… */
 object ContactMatcher {
     private val FILLER = setOf("a", "al", "el", "la", "mi", "my", "to", "the", "de")
+    private const val EXACT = 0
+    private const val PREFIX = 3
 
     /** Contacts ranked by how well they match [query]; only real matches are returned. */
     fun match(query: String, contacts: List<Contact>): List<Contact> {
@@ -27,11 +29,12 @@ object ContactMatcher {
     private fun score(wanted: List<String>, name: List<String>): Int? {
         if (name.isEmpty()) return null
         if (wanted == name) return 0
+        // A whole word counts far more than a prefix: "Ana" is Ana García before it is Anabel.
         var total = 0
         for (word in wanted) {
             total += when {
-                name.any { it == word } -> 1
-                name.any { it.startsWith(word) || word.startsWith(it) } -> 2
+                name.any { it == word } -> EXACT
+                name.any { it.startsWith(word) || word.startsWith(it) } -> PREFIX
                 else -> return null
             }
         }
