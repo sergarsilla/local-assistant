@@ -39,7 +39,13 @@ import dev.localassistant.ui.panel.PanelUiState
 import dev.localassistant.ui.panel.Suggestion
 import dev.localassistant.ui.settings.SettingsActions
 import dev.localassistant.ui.settings.SettingsScreen
+import dev.localassistant.ui.settings.PackUi
 import dev.localassistant.ui.settings.SettingsUiState
+import dev.localassistant.voice.VoicePack
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import dev.localassistant.ui.theme.AssistantTheme
 import dev.localassistant.voice.DictationState
 import dev.localassistant.voice.VoiceState
@@ -107,7 +113,7 @@ class ScreenshotTest {
     @Config(qualifiers = "+night")
     @Test fun panelConversationDark() = panelConversation()
 
-    @Test fun homeSetup() = capture("home_setup") {
+    @Test fun homeSetup() = captureScreen("home_setup") {
         HomeScreen(
             HomeUiState(
                 required = listOf(
@@ -126,7 +132,7 @@ class ScreenshotTest {
         )
     }
 
-    @Test fun homeReady() = capture("home_ready") {
+    @Test fun homeReady() = captureScreen("home_ready") {
         HomeScreen(
             HomeUiState(
                 required = StepId.entries.take(4).map { SetupStep(it, StepState.Done) },
@@ -140,7 +146,7 @@ class ScreenshotTest {
     @Config(qualifiers = "+night")
     @Test fun homeReadyDark() = homeReady()
 
-    @Test fun models() = capture("models") {
+    @Test fun models() = captureScreen("models") {
         ModelsScreen(
             ModelsUiState(
                 installed = listOf(
@@ -157,7 +163,7 @@ class ScreenshotTest {
         )
     }
 
-    @Test fun history() = capture("history") {
+    @Test fun history() = captureScreen("history") {
         val now = System.currentTimeMillis()
         val hour = 3_600_000L
         HistoryScreen(
@@ -177,7 +183,7 @@ class ScreenshotTest {
         )
     }
 
-    @Test fun historyDetail() = capture("history_detail") {
+    @Test fun historyDetail() = captureScreen("history_detail") {
         HistoryScreen(
             HistoryUiState(
                 hasConversations = true,
@@ -197,9 +203,20 @@ class ScreenshotTest {
         )
     }
 
-    @Test fun settings() = capture("settings") {
+    @Test fun settings() = captureScreen("settings") {
         SettingsScreen(
-            SettingsUiState(status = SystemStatus(isAssistant = true, micGranted = true, screenTextEnabled = true)),
+            SettingsUiState(
+                status = SystemStatus(isAssistant = true, micGranted = true, screenTextEnabled = true),
+                speechPacks = listOf(
+                    PackUi(VoicePack.STT_CANARY, installed = false, inUse = false, transfer = null),
+                    PackUi(VoicePack.STT_PARAKEET, installed = true, inUse = true, transfer = null),
+                ),
+                voicesEs = listOf(
+                    PackUi(VoicePack.TTS_ES_MIRO, installed = true, inUse = true, transfer = null),
+                    PackUi(VoicePack.TTS_ES_SHARVARD, installed = false, inUse = false, transfer = TransferState.Running("tts-es-sharvard", 40_000_000, 95_000_000)),
+                    PackUi(VoicePack.TTS_KOKORO_ES, installed = false, inUse = false, transfer = null),
+                ),
+            ),
             noop<SettingsActions>(),
         )
     }
@@ -222,6 +239,11 @@ class ScreenshotTest {
         captureRoboImage("build/outputs/roborazzi/$name${if (isNight()) "_dark" else ""}.png") {
             AssistantTheme { content() }
         }
+    }
+
+    /** App screens sit on the Scaffold's background in the app; the panel draws its own. */
+    private fun captureScreen(name: String, content: @Composable () -> Unit) = capture(name) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
     }
 
     private fun isNight(): Boolean =

@@ -50,7 +50,8 @@ fun VoiceLevelRing(
     Canvas(modifier.size(size)) {
         val radius = this.size.minDimension / 2
         val swell = maxOf(animated, idle)
-        drawCircle(color.copy(alpha = if (hearingSpeech) 0.28f else 0.16f), radius = radius * (0.55f + 0.45f * swell))
+        // The halo starts outside the inner disc, so it stays visible around a button drawn on top.
+        drawCircle(color.copy(alpha = if (hearingSpeech) 0.30f else 0.18f), radius = radius * (0.74f + 0.26f * swell))
         drawCircle(color.copy(alpha = 0.9f), radius = radius * 0.42f)
     }
 }

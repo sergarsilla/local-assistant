@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -80,6 +81,7 @@ import dev.localassistant.tools.ActionKind
 import dev.localassistant.tools.PendingAction
 import dev.localassistant.tools.ToolActivity
 import dev.localassistant.ui.components.ChatMessageList
+import dev.localassistant.ui.components.displayModelName
 import dev.localassistant.ui.components.VoiceLevelRing
 import dev.localassistant.ui.theme.AssistantIcons
 import dev.localassistant.ui.theme.Spacing
@@ -156,7 +158,10 @@ private fun PanelHeader(state: PanelUiState, actions: PanelActions) {
         IconToggleButton(
             checked = state.conversationMode,
             onCheckedChange = { actions.toggleConversationMode() },
-            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(),
+            colors = IconButtonDefaults.iconToggleButtonColors(
+                checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
         ) {
             Icon(AssistantIcons.GraphicEq, contentDescription = stringResource(R.string.panel_conversation))
         }
@@ -182,9 +187,9 @@ private fun EngineBadge(engine: EngineState, modifier: Modifier) {
             )
         }
         val label = when (engine) {
-            is EngineState.Loading -> stringResource(R.string.panel_loading_model, shortModelName(engine.model))
-            is EngineState.Ready -> stringResource(R.string.panel_model_ready, shortModelName(engine.model), engine.backend)
-            is EngineState.Failed -> stringResource(R.string.panel_model_failed, shortModelName(engine.model))
+            is EngineState.Loading -> stringResource(R.string.panel_loading_model, displayModelName(engine.model))
+            is EngineState.Ready -> stringResource(R.string.panel_model_ready, displayModelName(engine.model), engine.backend)
+            is EngineState.Failed -> stringResource(R.string.panel_model_failed, displayModelName(engine.model))
             EngineState.NoModel -> stringResource(R.string.panel_no_model_short)
             EngineState.Idle -> stringResource(R.string.app_name)
         }
@@ -285,7 +290,10 @@ private fun PendingActionCard(action: PendingAction, actions: PanelActions) {
             }
             Text(action.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s), modifier = Modifier.align(Alignment.End)) {
-                TextButton(onClick = actions::discardAction) { Text(stringResource(R.string.panel_action_discard)) }
+                TextButton(
+                    onClick = actions::discardAction,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                ) { Text(stringResource(R.string.panel_action_discard)) }
                 Button(onClick = actions::confirmAction) { Text(stringResource(R.string.panel_action_confirm)) }
             }
         }
@@ -426,9 +434,9 @@ private fun Composer(state: PanelUiState, actions: PanelActions) {
 /** The round button: stops an answer while one is written, otherwise starts or stops listening. */
 @Composable
 private fun MainButton(state: PanelUiState, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(76.dp)) {
         val voice = state.voice
-        if (voice is VoiceState.Listening) VoiceLevelRing(voice.level, voice.hearingSpeech, size = 64.dp)
+        if (voice is VoiceState.Listening) VoiceLevelRing(voice.level, voice.hearingSpeech, size = 76.dp)
         FilledIconButton(
             onClick = onClick,
             modifier = Modifier.size(52.dp),
@@ -442,11 +450,3 @@ private fun MainButton(state: PanelUiState, onClick: () -> Unit) {
         }
     }
 }
-
-/** File names are long and the header is narrow, so the extension and instruction tags go. */
-internal fun shortModelName(model: String) = model
-    .substringBeforeLast('.')
-    .replace(Regex("[-_](it|instruct)(?=[-_.]|$)", RegexOption.IGNORE_CASE), "")
-    .replace(Regex("[-_](Q\\d\\w*|q\\d\\w*|int\\d|f16|bf16)$"), "")
-    .replace('-', ' ')
-    .replace('_', ' ')

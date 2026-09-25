@@ -50,6 +50,7 @@ import dev.localassistant.ui.components.ConfirmDialog
 import dev.localassistant.ui.components.EmptyState
 import dev.localassistant.ui.components.SectionHeader
 import dev.localassistant.ui.components.formatSize
+import dev.localassistant.ui.components.displayModelName
 import dev.localassistant.ui.theme.AssistantIcons
 import dev.localassistant.ui.theme.Spacing
 
@@ -157,7 +158,8 @@ private fun InstalledCard(model: InstalledModelUi, actions: ModelsActions) {
         Row(Modifier.padding(start = Spacing.xs, end = Spacing.xs, top = Spacing.s, bottom = Spacing.s), verticalAlignment = Alignment.CenterVertically) {
             RadioButton(selected = model.active, onClick = { actions.select(model.name) })
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(model.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(displayModelName(model.name), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                MetaText(model.name)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     MetaText(formatSize(model.sizeBytes))
                     MetaText(stringResource(formatName(model.format)))

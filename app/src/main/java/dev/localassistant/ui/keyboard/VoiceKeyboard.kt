@@ -2,6 +2,7 @@ package dev.localassistant.ui.keyboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -81,16 +82,19 @@ fun VoiceKeyboard(state: DictationState, actions: VoiceKeyboardActions, modifier
 
 @Composable
 private fun RowScope.TextKey(label: String, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick, modifier = Modifier.weight(1f).height(KEY_HEIGHT)) {
+    FilledTonalButton(onClick = onClick, modifier = Modifier.weight(1f).height(KEY_HEIGHT), contentPadding = KEY_PADDING) {
         Text(label, style = MaterialTheme.typography.titleMedium)
     }
 }
 
 @Composable
 private fun RowScope.IconKey(icon: ImageVector, description: String, weight: Float = 1.2f, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick, modifier = Modifier.weight(weight).height(KEY_HEIGHT)) {
+    FilledTonalButton(onClick = onClick, modifier = Modifier.weight(weight).height(KEY_HEIGHT), contentPadding = KEY_PADDING) {
         Icon(icon, contentDescription = description)
     }
 }
 
 private val KEY_HEIGHT = 48.dp
+
+// Buttons pad their content by 24 dp a side, which leaves no room for an icon on a narrow key.
+private val KEY_PADDING = PaddingValues(0.dp)

@@ -37,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
 import dev.localassistant.ui.components.SectionHeader
+import dev.localassistant.ui.components.displayModelName
 import dev.localassistant.ui.components.formatSize
 import dev.localassistant.ui.theme.AssistantIcons
 import dev.localassistant.ui.theme.Spacing
@@ -97,7 +98,7 @@ private fun ReadyCard(activeModel: String?, onTry: () -> Unit, onOpenModels: () 
             )
             activeModel?.let {
                 Text(
-                    stringResource(R.string.home_ready_model, it),
+                    stringResource(R.string.home_ready_model, displayModelName(it)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
