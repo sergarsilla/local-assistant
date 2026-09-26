@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -40,10 +42,32 @@ android {
         }
     }
 
+    /**
+     * Signing details come from a keystore.properties that is not in the repository, or from the
+     * environment when a machine builds this without one. Unsigned release builds still work;
+     * they just cannot be installed until they are signed.
+     */
+    val signing = Properties().apply {
+        rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    }
+
+    fun setting(key: String, variable: String): String? =
+        signing.getProperty(key) ?: System.getenv(variable)
+
+    signingConfigs {
+        create("release") {
+            setting("storeFile", "KEYSTORE_FILE")?.let { storeFile = file(it) }
+            storePassword = setting("storePassword", "KEYSTORE_PASSWORD")
+            keyAlias = setting("keyAlias", "KEY_ALIAS")
+            keyPassword = setting("keyPassword", "KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile?.exists() == true }
         }
     }
 

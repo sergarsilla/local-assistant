@@ -19,3 +19,8 @@ captures/
 # Personal project brief, not part of the published app
 AGENT_PROMPT.md
 PROJECT_SPEC.md
+
+# Release signing: real values stay on the machine that builds
+keystore.properties
+*.jks
+*.keystore
