@@ -184,7 +184,7 @@ class BenchmarkActivity : Activity() {
         thread(name = "bench") {
             try {
                 when {
-                    modelName.endsWith(".gguf") -> runLlamaChat(model, threads.takeIf { it > 0 } ?: 4)
+                    modelName.endsWith(".gguf") -> runLlamaChat(model, threads.takeIf { it > 0 } ?: 4, intent.getIntExtra("ctx", 4096))
                     chat -> runChat(model, backend, cache)
                     else -> runSynthetic(model, backend, cache)
                 }
@@ -261,10 +261,10 @@ class BenchmarkActivity : Activity() {
     }
 
     /** Same engine and process limits as the assistant panel, plus page-fault and memcg counters. */
-    private fun runLlamaChat(model: File, threads: Int) {
+    private fun runLlamaChat(model: File, threads: Int, contextSize: Int) {
         val loadStart = SystemClock.elapsedRealtime()
-        LlamaCppEngine.load(model, 4096, threads).use { engine ->
-            report("LOAD ${SystemClock.elapsedRealtime() - loadStart}ms ${faults()}")
+        LlamaCppEngine.load(model, contextSize, threads).use { engine ->
+            report("LOAD ctx=$contextSize ${SystemClock.elapsedRealtime() - loadStart}ms ${faults()}")
             val messages = listOf(ChatMessage(Role.USER, LONG_PROMPT))
             val before = faults()
             runBlocking {
