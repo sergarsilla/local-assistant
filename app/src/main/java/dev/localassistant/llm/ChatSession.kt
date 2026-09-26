@@ -77,6 +77,9 @@ class ChatSession(
     private var job: Job? = null
     private var turn = 0
 
+    /** The clock line given to the model this turn, so an echo of it never reaches the user. */
+    private var clock = ""
+
     /** Loading a saved conversation; a question asked meanwhile waits for it. */
     private var loading: Job? = null
 
@@ -206,12 +209,16 @@ class ChatSession(
             val offered = if (round == MAX_TOOL_ROUNDS - 1) emptyList() else available
             val requested = mutableListOf<ToolCall>()
             var replyText = ""
+            var spoken = ""
             engine.generate(conversation, offered).collect { event ->
                 when (event) {
                     is GenerationEvent.Text -> {
                         replyText += event.chunk
-                        appendToReply(event.chunk)
-                        listener?.onChunk(event.chunk)
+                        val shown = showReply(replyText)
+                        if (shown.length > spoken.length) {
+                            listener?.onChunk(shown.substring(spoken.length))
+                            spoken = shown
+                        }
                     }
                     is GenerationEvent.ToolRequest -> requested += event.call
                     is GenerationEvent.Finished -> event.stats?.let {
@@ -241,9 +248,19 @@ class ChatSession(
         }
     }
 
-    private fun appendToReply(chunk: String) = _messages.update { list ->
-        val last = list.last()
-        list.dropLast(1) + last.copy(text = (last.text + chunk).trimStart())
+    /**
+     * Shows the reply so far and returns it. Small models often open by repeating the clock line
+     * they were handed, so that echo is dropped, and hidden while it is still arriving.
+     */
+    private fun showReply(reply: String): String {
+        val soFar = reply.trimStart()
+        val text = when {
+            soFar.startsWith(clock) -> soFar.removePrefix(clock).trimStart()
+            clock.startsWith(soFar) -> ""
+            else -> soFar
+        }
+        _messages.update { list -> list.dropLast(1) + list.last().copy(text = text) }
+        return text
     }
 
     private fun dropEmptyReply() = _messages.update { list ->
@@ -256,11 +273,9 @@ class ChatSession(
      */
     private fun decorate(question: String, screen: ScreenAttachment?): String = buildString {
         val screenText = screen?.text
-        append('[')
-        append(SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()))
-        append(" ")
-        append(TimeZone.getDefault().id)
-        appendLine("]")
+        clock = "[" + SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()) +
+            " " + TimeZone.getDefault().id + "]"
+        appendLine(clock)
         if (screenText.isNullOrBlank() && screen?.image != null) {
             appendLine("(A screenshot of the user's screen is attached.)")
         }
