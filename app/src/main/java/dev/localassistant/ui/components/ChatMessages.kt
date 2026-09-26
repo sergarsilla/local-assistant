@@ -72,6 +72,9 @@ fun ChatMessage(message: UiMessage, copyLabel: String, onCopy: (String) -> Unit,
         Column(modifier.fillMaxWidth()) {
             when {
                 message.text.isEmpty() && message.streaming -> TypingIndicator(Modifier.padding(vertical = Spacing.s))
+                // Parsing the Markdown again for every token costs more with each one, and it is
+                // what makes a streaming reply stutter. The finished reply gets the real rendering.
+                message.streaming -> Text(message.text, style = MaterialTheme.typography.bodyLarge)
                 else -> SelectionContainer { MarkdownText(message.text) }
             }
             if (!message.streaming && message.text.isNotEmpty()) {
