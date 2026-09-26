@@ -35,17 +35,18 @@ sealed interface EngineState {
 
 /** Where LiteRT-LM models run. GGUF models always use the CPU. */
 enum class Accelerator {
-    /** The GPU, falling back to the CPU. */
-    AUTO,
     CPU,
 
-    /** Experimental: the Tensor NPU, which needs models compiled for it; falls back like [AUTO]. */
+    /** The GPU, falling back to the CPU. */
+    GPU,
+
+    /** Experimental: the Tensor NPU, which needs models compiled for it; falls back like [GPU]. */
     NPU,
 }
 
 /** How models are loaded, and which accelerators turned out to be unusable on this phone. */
 data class EnginePreferences(
-    val accelerator: Accelerator = Accelerator.AUTO,
+    val accelerator: Accelerator = Accelerator.CPU,
     val gpuBroken: Boolean = false,
     val npuBroken: Boolean = false,
     /** Loads the vision encoder too, so screenshots can be understood; costs memory. */
@@ -183,10 +184,15 @@ class EngineHolder(
     }
 
     /**
-     * The GPU decodes Gemma 4 E2B more than twice as fast as the CPU, but GPU and NPU drivers can
-     * also kill the process outright instead of reporting an error. A marker naming the backend
-     * is written before each attempt and removed after it; if it is still there on the next
-     * start, that backend crashed us and is not tried again until the user picks it anew.
+     * The CPU is the default because it is what answers fastest. Measured on a Tensor G5 with
+     * Gemma 4 E2B: the CPU decodes 18.3 tok/s against the GPU's 6.7, and loads in 1s against 9s
+     * warm and 59s cold. The GPU only wins on prefill (550 against 185 tok/s), which pays off
+     * with very long prompts, so it stays an explicit choice.
+     *
+     * GPU and NPU drivers can also kill the process outright instead of reporting an error. A
+     * marker naming the backend is written before each attempt and removed after it; if it is
+     * still there on the next start, that backend crashed us and is not tried again until the
+     * user picks it anew.
      */
     private fun loadLiteRt(model: InstalledModel): LlmEngine {
         val cache = File(context.cacheDir, "litertlm").apply { mkdirs() }
@@ -246,7 +252,7 @@ class EngineHolder(
         return EnginePreferences(
             accelerator = prefs.getString(KEY_ACCELERATOR, null)
                 ?.let { name -> Accelerator.entries.firstOrNull { it.name == name } }
-                ?: Accelerator.AUTO,
+                ?: Accelerator.CPU,
             gpuBroken = prefs.getBoolean(KEY_GPU_BROKEN, false),
             npuBroken = prefs.getBoolean(KEY_NPU_BROKEN, false),
             understandImages = prefs.getBoolean(KEY_IMAGES, false),

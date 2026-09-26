@@ -195,10 +195,10 @@
     <string name="settings_wake_summary">Listens in the background for the phrase below and opens the assistant. Uses some battery; a notification shows while it is on.</string>
     <string name="settings_wake_unavailable">Needs the microphone and Local Assistant set as the digital assistant.</string>
     <string name="settings_model">Model</string>
-    <string name="settings_accel_auto">GPU (recommended)</string>
-    <string name="settings_accel_auto_note">More than twice as fast; falls back to the CPU if the GPU fails.</string>
-    <string name="settings_accel_cpu">CPU only</string>
-    <string name="settings_accel_cpu_note">Slower, but works on every phone.</string>
+    <string name="settings_accel_gpu">GPU</string>
+    <string name="settings_accel_gpu_note">Starts long questions faster, but writes the answer more slowly. Falls back to the CPU if the GPU fails.</string>
+    <string name="settings_accel_cpu">CPU (recommended)</string>
+    <string name="settings_accel_cpu_note">Writes answers fastest and loads in about a second.</string>
     <string name="settings_accel_npu">NPU (experimental)</string>
     <string name="settings_accel_npu_note">Needs models compiled for the Tensor NPU; others fall back to the GPU.</string>
     <string name="settings_accel_npu_broken">The NPU failed on this phone. Choose it again to retry.</string>

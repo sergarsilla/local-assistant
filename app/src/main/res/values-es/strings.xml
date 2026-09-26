@@ -195,10 +195,10 @@
     <string name="settings_wake_summary">Escucha en segundo plano la frase de abajo y abre el asistente. Gasta algo de batería; se muestra una notificación mientras está activa.</string>
     <string name="settings_wake_unavailable">Necesita el micrófono y que Asistente local sea el asistente digital.</string>
     <string name="settings_model">Modelo</string>
-    <string name="settings_accel_auto">GPU (recomendado)</string>
-    <string name="settings_accel_auto_note">Más del doble de rápido; vuelve a la CPU si la GPU falla.</string>
-    <string name="settings_accel_cpu">Solo CPU</string>
-    <string name="settings_accel_cpu_note">Más lento, pero funciona en cualquier móvil.</string>
+    <string name="settings_accel_gpu">GPU</string>
+    <string name="settings_accel_gpu_note">Empieza antes las preguntas largas, pero escribe la respuesta más despacio. Vuelve a la CPU si la GPU falla.</string>
+    <string name="settings_accel_cpu">CPU (recomendado)</string>
+    <string name="settings_accel_cpu_note">Escribe las respuestas más rápido y carga en aproximadamente un segundo.</string>
     <string name="settings_accel_npu">NPU (experimental)</string>
     <string name="settings_accel_npu_note">Necesita modelos compilados para la NPU del Tensor; los demás usan la GPU.</string>
     <string name="settings_accel_npu_broken">La NPU falló en este móvil. Elígela de nuevo para reintentarlo.</string>

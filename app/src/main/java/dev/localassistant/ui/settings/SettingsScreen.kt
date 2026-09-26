@@ -216,7 +216,7 @@ private fun LazyListScope.modelSection(state: SettingsUiState, actions: Settings
     section(R.string.settings_model)
     items(Accelerator.entries, key = { "a:" + it.name }) { accelerator ->
         val broken = when (accelerator) {
-            Accelerator.AUTO -> state.engine.gpuBroken
+            Accelerator.GPU -> state.engine.gpuBroken
             Accelerator.NPU -> state.engine.npuBroken
             Accelerator.CPU -> false
         }
@@ -395,13 +395,13 @@ private fun About() {
 private fun onOff(value: Boolean) = stringResource(if (value) R.string.settings_on else R.string.settings_off)
 
 private fun Accelerator.label() = when (this) {
-    Accelerator.AUTO -> R.string.settings_accel_auto
+    Accelerator.GPU -> R.string.settings_accel_gpu
     Accelerator.CPU -> R.string.settings_accel_cpu
     Accelerator.NPU -> R.string.settings_accel_npu
 }
 
 private fun Accelerator.note() = when (this) {
-    Accelerator.AUTO -> R.string.settings_accel_auto_note
+    Accelerator.GPU -> R.string.settings_accel_gpu_note
     Accelerator.CPU -> R.string.settings_accel_cpu_note
     Accelerator.NPU -> R.string.settings_accel_npu_note
 }
