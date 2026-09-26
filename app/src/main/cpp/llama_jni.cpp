@@ -85,9 +85,15 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeLoad(JNIEnv *env, jclass, jstri
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
     llama_model_params modelParams = llama_model_default_params();
-    // Mapping the file makes loading look instant but then the first reply pays for reading every
-    // weight from storage; loading it outright keeps the first answer as quick as the next ones.
-    modelParams.load_mode = LLAMA_LOAD_MODE_NONE;
+    // Reading every weight into memory of our own was quickest while models fitted what Android
+    // lets one app hold, and ruinous once they did not: those pages have nowhere to go but zram,
+    // and get compressed and fetched back as the model works. Letting llama.cpp choose measured
+    // best on both counts here (tok/s decoding, Tensor G5, 4096 tokens of context):
+    //
+    //                          own memory      mapped file      llama.cpp's choice
+    //   Gemma 4 E2B Q4_0           9.7           6.4, 5.4              9.4
+    //   Qwen3 4B Q4_0          minutes           7.6                   3.8
+    modelParams.load_mode = LLAMA_LOAD_MODE_AUTO;
     llama_model *model = llama_model_load_from_file(path, modelParams);
     env->ReleaseStringUTFChars(jpath, path);
     if (model == nullptr) return 0;
