@@ -1,6 +1,8 @@
 package dev.localassistant.assistant
 
+import android.app.LocaleManager
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
@@ -81,7 +83,7 @@ class AssistantSession(context: Context) :
             decor.setViewTreeSavedStateRegistryOwner(this)
             decor.setViewTreeViewModelStoreOwner(this)
         }
-        return ComposeView(context).apply {
+        return ComposeView(inAppLanguage(context)).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AssistantSession))
             setContent {
                 AssistantTheme {
@@ -89,6 +91,20 @@ class AssistantSession(context: Context) :
                 }
             }
         }
+    }
+
+    /**
+     * The panel window is built by the system, so it is born with the system language even when
+     * the user chose another one for this app. Activities get that choice applied for them;
+     * this window has to ask for it.
+     */
+    private fun inAppLanguage(context: Context): Context {
+        val locales = context.getSystemService(LocaleManager::class.java)
+            ?.applicationLocales
+            ?.takeIf { !it.isEmpty }
+            ?: return context
+        val configuration = Configuration(context.resources.configuration).apply { setLocales(locales) }
+        return context.createConfigurationContext(configuration)
     }
 
     override fun onHandleAssist(state: AssistState) {
