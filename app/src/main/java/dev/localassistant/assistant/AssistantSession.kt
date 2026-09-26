@@ -131,10 +131,13 @@ class AssistantSession(context: Context) :
         // The panel needs the microphone; the wake word spotter lets go of it until the panel closes.
         AssistantRuntime.wakeWord.setPaused(true)
         WakeWordService.syncWithSettings(context)
-        // Load the model and process the fixed start of the prompt while the user is still
-        // typing or speaking.
-        AssistantRuntime.engine.preload(chat::preface)
-        voice.preload()
+        // Loading the model and the voices saturates every core for over a second. Started here
+        // they compete with the panel's own first frames, so they wait until it is on screen:
+        // the user is still reading it, and nothing they can do needs the model this soon.
+        afterFirstFrame {
+            AssistantRuntime.engine.preload(chat::preface)
+            voice.preload()
+        }
         // Sending the user to another app means getting out of their way; a timer does not.
         AssistantRuntime.tools.activityStarter = { intent, leavesPanel ->
             startAssistantActivity(intent)
@@ -174,14 +177,24 @@ class AssistantSession(context: Context) :
         const val NO_CONVERSATION = -1L
     }
 
-    private fun logFirstFrame() {
-        val decor = window.window?.decorView ?: return
+    /** Runs [work] on the main thread once the panel has actually been drawn, and only once. */
+    private fun afterFirstFrame(work: () -> Unit) {
+        val decor = window.window?.decorView ?: return work()
         decor.viewTreeObserver.addOnDrawListener(object : ViewTreeObserver.OnDrawListener {
+            private var done = false
+
             override fun onDraw() {
-                val elapsed = SystemClock.elapsedRealtime() - showRequestedAt
-                Log.i(AssistantService.TAG, "Panel first frame after ${elapsed}ms")
-                decor.post { decor.viewTreeObserver.removeOnDrawListener(this) }
+                if (done) return
+                done = true
+                decor.post {
+                    decor.viewTreeObserver.removeOnDrawListener(this)
+                    work()
+                }
             }
         })
+    }
+
+    private fun logFirstFrame() = afterFirstFrame {
+        Log.i(AssistantService.TAG, "Panel first frame after ${SystemClock.elapsedRealtime() - showRequestedAt}ms")
     }
 }
