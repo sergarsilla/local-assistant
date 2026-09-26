@@ -15,7 +15,7 @@
     <string name="home_setup_title">Vamos a dejarlo listo</string>
     <string name="home_setup_progress">%1$d de %2$d pasos hechos</string>
     <string name="home_ready_title">Todo listo</string>
-    <string name="home_ready_body">Mantén pulsado el botón de encendido, o desliza hacia arriba desde una esquina inferior, para abrirlo encima de cualquier app.</string>
+    <string name="home_ready_body">Desliza hacia arriba desde una esquina inferior para abrirlo encima de cualquier app. En los móviles que lo ofrecen, mantener pulsado el botón de encendido también vale.</string>
     <string name="home_ready_model">Modelo: %1$s</string>
     <string name="home_try">Probar ahora</string>
     <string name="home_change_model">Cambiar modelo</string>

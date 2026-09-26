@@ -15,7 +15,7 @@
     <string name="home_setup_title">Let\'s get it ready</string>
     <string name="home_setup_progress">%1$d of %2$d steps done</string>
     <string name="home_ready_title">All set</string>
-    <string name="home_ready_body">Long-press the power button, or swipe up from a bottom corner, to open it over any app.</string>
+    <string name="home_ready_body">Swipe up from a bottom corner to open it over any app. On phones that offer it, holding the power button works too.</string>
     <string name="home_ready_model">Model: %1$s</string>
     <string name="home_try">Try it now</string>
     <string name="home_change_model">Change model</string>
