@@ -143,6 +143,18 @@ class EngineHolder(
     }
 
     /** Choosing an accelerator again is also how the user retries one that crashed before. */
+    /**
+     * Android caps how much memory one app may hold, and a model whose weights plus conversation
+     * go over it is not killed but throttled: the kernel takes its pages away and fetches them
+     * back as it works. Measured on a Tensor G5, a 4B model holding 4096 tokens answered in
+     * minutes; the same model holding 2048 answered at 7.6 tok/s. Which models this hits is not
+     * something the app can tell from their size, so it is offered as a choice.
+     */
+    fun setContextSize(name: String, tokens: Int) {
+        store.setContext(name, tokens)
+        if (loaded?.first == name) releaseNow()
+    }
+
     fun setAccelerator(accelerator: Accelerator) {
         prefs.edit()
             .putString(KEY_ACCELERATOR, accelerator.name)
@@ -179,7 +191,7 @@ class EngineHolder(
     }
 
     private fun load(model: InstalledModel): LlmEngine = when (model.format) {
-        ModelFormat.GGUF -> LlamaCppEngine.load(model.file, CONTEXT_SIZE, THREADS)
+        ModelFormat.GGUF -> LlamaCppEngine.load(model.file, model.contextTokens ?: CONTEXT_SIZE, THREADS)
         ModelFormat.LITERT_LM -> loadLiteRt(model)
     }
 
@@ -261,7 +273,10 @@ class EngineHolder(
 
     companion object {
         private const val TAG = "EngineHolder"
-        private const val CONTEXT_SIZE = 4096
+        const val CONTEXT_SIZE = 4096
+
+        /** What a model can be given to hold, largest first. */
+        val CONTEXT_CHOICES = listOf(4096, 2048, 1024)
 
         // Measured on a Tensor G5: 4 threads decode as fast as 6 and leave cores for the UI.
         private const val THREADS = 4

@@ -150,8 +150,8 @@ class ScreenshotTest {
         ModelsScreen(
             ModelsUiState(
                 installed = listOf(
-                    InstalledModelUi("gemma-4-E2B-it.litertlm", 2_588_147_712, ModelFormat.LITERT_LM, 51.8, active = true, runningOn = "GPU"),
-                    InstalledModelUi("Qwen3-4B-Instruct-2507-Q4_K_M.gguf", 2_500_000_000, ModelFormat.GGUF, 9.4, active = false, runningOn = null),
+                    InstalledModelUi("gemma-4-E2B-it.litertlm", 2_588_147_712, ModelFormat.LITERT_LM, 51.8, contextTokens = 4096, active = true, runningOn = "GPU"),
+                    InstalledModelUi("Qwen3-4B-Instruct-2507-Q4_K_M.gguf", 2_500_000_000, ModelFormat.GGUF, 9.4, contextTokens = 2048, active = false, runningOn = null),
                 ),
                 transfers = listOf(TransferState.Running("gemma-4-E4B-it.litertlm", 1_200_000_000, 3_660_000_000)),
                 catalog = Catalog.recommended.mapIndexed { index, entry ->

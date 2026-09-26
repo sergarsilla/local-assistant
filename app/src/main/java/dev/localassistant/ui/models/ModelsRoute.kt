@@ -48,6 +48,7 @@ fun ModelsRoute(
     val actions = remember(viewModel) {
         object : ModelsActions {
             override fun select(name: String) = viewModel.select(name)
+            override fun setContextSize(name: String, tokens: Int) = viewModel.setContextSize(name, tokens)
             override fun requestDelete(name: String) = viewModel.requestDelete(name)
             override fun confirmDelete() = viewModel.confirmDelete()
             override fun cancelDelete() = viewModel.cancelDelete()

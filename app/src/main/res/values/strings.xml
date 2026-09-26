@@ -127,6 +127,8 @@
     <string name="models_delete_confirm">%1$s will be removed, freeing %2$s.</string>
     <string name="models_speed">%1$.1f tok/s</string>
     <string name="models_speed_unknown">speed not measured yet</string>
+    <string name="models_context">Conversation it can hold</string>
+    <string name="models_context_tokens">%1$d tokens</string>
     <string name="models_running_on">running on %1$s</string>
     <string name="models_recommended">Recommended</string>
     <string name="models_download">Download</string>

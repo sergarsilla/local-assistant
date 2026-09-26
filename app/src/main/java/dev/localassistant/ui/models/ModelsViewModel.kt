@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.localassistant.AssistantRuntime
+import dev.localassistant.llm.EngineHolder
 import dev.localassistant.llm.EngineState
 import dev.localassistant.models.Catalog
 import dev.localassistant.models.CatalogEntry
@@ -33,6 +34,7 @@ data class InstalledModelUi(
     val sizeBytes: Long,
     val format: ModelFormat,
     val tokensPerSecond: Double?,
+    val contextTokens: Int,
     val active: Boolean,
     /** "GPU" or "CPU" while the model is loaded. */
     val runningOn: String?,
@@ -80,6 +82,7 @@ class ModelsViewModel(application: Application) : AndroidViewModel(application) 
                 sizeBytes = model.sizeBytes,
                 format = model.format,
                 tokensPerSecond = model.tokensPerSecond,
+                contextTokens = model.contextTokens ?: EngineHolder.CONTEXT_SIZE,
                 active = model.name == active,
                 runningOn = (engine as? EngineState.Ready)?.takeIf { it.model == model.name }?.backend,
             )
@@ -107,6 +110,8 @@ class ModelsViewModel(application: Application) : AndroidViewModel(application) 
             pendingDelete = models.firstOrNull { it.name == deleting },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ModelsUiState())
+
+    fun setContextSize(name: String, tokens: Int) = runtime.engine.setContextSize(name, tokens)
 
     fun refresh() {
         system.value = SystemStatus.read(getApplication())

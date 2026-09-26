@@ -12,6 +12,8 @@ data class InstalledModel(
     val format: ModelFormat,
     val source: String?,
     val tokensPerSecond: Double?,
+    /** How much conversation this model is given to hold; null means the usual amount. */
+    val contextTokens: Int?,
 ) {
     val name: String get() = file.name
     val sizeBytes: Long get() = file.length()
@@ -44,6 +46,8 @@ class ModelStore(context: Context) {
 
     fun recordSpeed(name: String, tokensPerSecond: Double) = updateMeta(name) { put("tps", tokensPerSecond) }
 
+    fun setContext(name: String, tokens: Int) = updateMeta(name) { put("ctx", tokens) }
+
     fun delete(name: String) {
         File(directory, name).delete()
         prefs.edit().remove(metaKey(name)).apply()
@@ -70,6 +74,7 @@ class ModelStore(context: Context) {
                     format = format,
                     source = meta.optString("source").ifEmpty { null },
                     tokensPerSecond = meta.optDouble("tps").takeUnless { it.isNaN() },
+                    contextTokens = meta.optInt("ctx").takeIf { it > 0 },
                 )
             }
             .sortedBy { it.name }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
+import dev.localassistant.llm.EngineHolder
 import dev.localassistant.models.ModelFormat
 import dev.localassistant.models.RemoteModelFile
 import dev.localassistant.models.TransferState
@@ -56,6 +58,7 @@ import dev.localassistant.ui.theme.Spacing
 
 interface ModelsActions {
     fun select(name: String)
+    fun setContextSize(name: String, tokens: Int)
     fun requestDelete(name: String)
     fun confirmDelete()
     fun cancelDelete()
@@ -169,9 +172,31 @@ private fun InstalledCard(model: InstalledModelUi, actions: ModelsActions) {
                     )
                     model.runningOn?.let { MetaText(stringResource(R.string.models_running_on, it)) }
                 }
+                if (model.format == ModelFormat.GGUF) ContextChoice(model, actions)
             }
             IconButton(onClick = { actions.requestDelete(model.name) }) {
                 Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.models_delete))
+            }
+        }
+    }
+}
+
+/**
+ * How much conversation this model is given to hold. A model whose weights plus conversation go
+ * over what Android lets one app hold is not stopped but slowed to a crawl, and which models
+ * that hits cannot be told from their size, so the choice is offered rather than guessed.
+ */
+@Composable
+private fun ContextChoice(model: InstalledModelUi, actions: ModelsActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        MetaText(stringResource(R.string.models_context))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            EngineHolder.CONTEXT_CHOICES.forEach { tokens ->
+                FilterChip(
+                    selected = model.contextTokens == tokens,
+                    onClick = { actions.setContextSize(model.name, tokens) },
+                    label = { Text(stringResource(R.string.models_context_tokens, tokens)) },
+                )
             }
         }
     }
