@@ -54,6 +54,12 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Use a debug build to work on the app, not to use it. Scrolling a list drops around a tenth of
+its frames in debug against half a percent in release, on the same phone, because the debug
+build skips R8 and carries Compose's instrumentation. For real use, copy
+`keystore.properties.example` to `keystore.properties`, fill it in, and build
+`./gradlew :app:assembleRelease`.
+
 Then open the app: the Home tab walks through setting it as the assistant, the microphone and the
 downloads. Both GGUF and LiteRT-LM models can use the phone actions.
 
@@ -77,6 +83,21 @@ CI builds the APK and runs both on every push; the screenshots are published as 
 
 `docs/ESTADO.md` has the current review: what works, what was fixed, what is next and how to
 verify it on the phone.
+
+## What to expect
+
+The phone is the ceiling. Android caps how much memory one app may hold - 3.1 GiB on a Pixel 10 -
+and the model, the speech recogniser and the voices all come out of that. A 2B model answers at
+around 10 tokens a second; a 4B one that does not fit is slowed to a crawl rather than refused,
+so the Models screen offers a smaller context for models that need it.
+
+That ceiling is also the honest limit on how clever the assistant is. Models this size get
+arithmetic wrong, lose the thread of a long conversation, and sometimes answer in the wrong
+language. The app can make them quick and private; it cannot make them larger.
+
+Known gaps: speaking over the assistant to interrupt it needs echo cancellation that is not
+written yet, so interrupting is a tap; the Tensor NPU needs a dispatch library built separately;
+and nothing here can close another app or stop its navigation, which Android does not allow.
 
 ## Privacy
 
