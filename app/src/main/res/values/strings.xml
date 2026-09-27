@@ -82,8 +82,11 @@
     <string name="panel_listening">Listening…</string>
     <string name="panel_hearing">I can hear you…</string>
     <string name="panel_transcribing">Transcribing…</string>
-    <string name="panel_speaking">Speaking</string>
-    <string name="panel_stop_speaking">Stop</string>
+    <string name="panel_speaking">Speaking · tap to interrupt</string>
+    <string name="panel_interrupt">Interrupt</string>
+    <string name="panel_thinking">Thinking…</string>
+    <string name="panel_tap_to_talk">Tap to talk</string>
+    <string name="panel_type">Type instead</string>
     <string name="panel_needs_mic">The microphone permission is off.</string>
     <string name="panel_needs_voice_model">No speech model installed.</string>
     <string name="panel_open_voice_setup">Set up</string>

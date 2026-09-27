@@ -82,8 +82,11 @@
     <string name="panel_listening">Escuchando…</string>
     <string name="panel_hearing">Te oigo…</string>
     <string name="panel_transcribing">Transcribiendo…</string>
-    <string name="panel_speaking">Hablando</string>
-    <string name="panel_stop_speaking">Parar</string>
+    <string name="panel_speaking">Hablando · toca para interrumpir</string>
+    <string name="panel_interrupt">Interrumpir</string>
+    <string name="panel_thinking">Pensando…</string>
+    <string name="panel_tap_to_talk">Toca para hablar</string>
+    <string name="panel_type">Escribir</string>
     <string name="panel_needs_mic">El permiso de micrófono está desactivado.</string>
     <string name="panel_needs_voice_model">No hay ningún modelo de voz instalado.</string>
     <string name="panel_open_voice_setup">Configurar</string>

@@ -27,7 +27,10 @@ import dev.localassistant.ui.markdown.MarkdownText
 import dev.localassistant.ui.theme.AssistantIcons
 import dev.localassistant.ui.theme.Spacing
 
-/** A conversation as a scrolling list: the user's turns as bubbles, the assistant's as text. */
+/**
+ * A conversation as a scrolling list: the user's turns as bubbles, the assistant's as text.
+ * [copyLastOnly] keeps the copy button to the latest reply, for places short on room.
+ */
 @Composable
 fun ChatMessageList(
     messages: List<UiMessage>,
@@ -36,6 +39,7 @@ fun ChatMessageList(
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    copyLastOnly: Boolean = false,
 ) {
     LazyColumn(
         state = state,
@@ -43,14 +47,15 @@ fun ChatMessageList(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
-        itemsIndexed(messages, key = { index, message -> "$index:${message.role}" }) { _, message ->
-            ChatMessage(message, copyLabel = copyLabel, onCopy = onCopy)
+        itemsIndexed(messages, key = { index, message -> "$index:${message.role}" }) { index, message ->
+            val copy = onCopy.takeIf { !copyLastOnly || index == messages.lastIndex }
+            ChatMessage(message, copyLabel = copyLabel, onCopy = copy)
         }
     }
 }
 
 @Composable
-fun ChatMessage(message: UiMessage, copyLabel: String, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ChatMessage(message: UiMessage, copyLabel: String, onCopy: ((String) -> Unit)?, modifier: Modifier = Modifier) {
     if (message.role == Role.USER) {
         Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Surface(
@@ -77,7 +82,7 @@ fun ChatMessage(message: UiMessage, copyLabel: String, onCopy: (String) -> Unit,
                 message.streaming -> Text(message.text, style = MaterialTheme.typography.bodyLarge)
                 else -> SelectionContainer { MarkdownText(message.text) }
             }
-            if (!message.streaming && message.text.isNotEmpty()) {
+            if (onCopy != null && !message.streaming && message.text.isNotEmpty()) {
                 IconButton(onClick = { onCopy(message.text) }, modifier = Modifier.size(36.dp)) {
                     Icon(
                         AssistantIcons.ContentCopy,

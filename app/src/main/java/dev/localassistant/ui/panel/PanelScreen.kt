@@ -1,11 +1,7 @@
 package dev.localassistant.ui.panel
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,7 +19,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,23 +31,22 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.IconToggleButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,6 +56,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -72,6 +67,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
@@ -81,18 +77,22 @@ import dev.localassistant.tools.ActionKind
 import dev.localassistant.tools.PendingAction
 import dev.localassistant.tools.ToolActivity
 import dev.localassistant.ui.components.ChatMessageList
+import dev.localassistant.ui.components.VoiceMode
+import dev.localassistant.ui.components.VoiceOrb
 import dev.localassistant.ui.components.displayModelName
-import dev.localassistant.ui.components.VoiceLevelRing
 import dev.localassistant.ui.theme.AssistantIcons
 import dev.localassistant.ui.theme.Spacing
 import dev.localassistant.voice.VoiceState
+import java.util.Locale
 
 /**
- * The assistant as a sheet over whatever app is open. Tapping outside dismisses it; tapping
- * inside only silences the voice, so a stray touch never loses the conversation.
+ * The assistant as a sheet over whatever app is open, laid out to be used at a glance and with
+ * a thumb: the voice button is also the status display. Tapping outside dismisses the sheet;
+ * tapping inside only silences the voice, so a stray touch never loses the conversation.
+ * [startTyping] opens it with the keyboard composer instead of the voice button.
  */
 @Composable
-fun PanelScreen(state: PanelUiState, actions: PanelActions) {
+fun PanelScreen(state: PanelUiState, actions: PanelActions, startTyping: Boolean = false) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -114,7 +114,7 @@ fun PanelScreen(state: PanelUiState, actions: PanelActions) {
             Column(
                 Modifier
                     .navigationBarsPadding()
-                    .padding(start = Spacing.l, end = Spacing.l, bottom = Spacing.m)
+                    .padding(start = Spacing.l, end = Spacing.l, bottom = Spacing.l)
                     .animateContentSize(),
                 verticalArrangement = Arrangement.spacedBy(Spacing.m),
             ) {
@@ -125,11 +125,11 @@ fun PanelScreen(state: PanelUiState, actions: PanelActions) {
                 } else {
                     Conversation(state, actions)
                 }
-                ToolActivityRow(state.toolActivity.takeIf { state.generating })
                 state.pendingAction?.let { PendingActionCard(it, actions) }
                 ErrorCard(state.error, onOpenModels = actions::openModels)
-                VoiceStatus(state, actions)
-                Composer(state, actions)
+                VoiceSetupCard(state.voice, onOpenSettings = actions::openVoiceSettings)
+                PanelToggles(state, actions)
+                Composer(state, actions, startTyping)
             }
         }
     }
@@ -146,27 +146,15 @@ private fun DragHandle() {
     }
 }
 
+/** Only what the sheet itself needs; spaced so "new" and "close" are not mistaken for each other. */
 @Composable
 private fun PanelHeader(state: PanelUiState, actions: PanelActions) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
         EngineBadge(state.engine, Modifier.weight(1f))
         if (state.messages.isNotEmpty()) {
             IconButton(onClick = actions::newConversation) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.panel_new_conversation))
             }
-        }
-        IconToggleButton(
-            checked = state.conversationMode,
-            onCheckedChange = { actions.toggleConversationMode() },
-            colors = IconButtonDefaults.iconToggleButtonColors(
-                checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
-        ) {
-            Icon(AssistantIcons.GraphicEq, contentDescription = stringResource(R.string.panel_conversation))
-        }
-        TextButton(onClick = actions::switchLanguage) {
-            Text(state.language.uppercase(), style = MaterialTheme.typography.labelLarge)
         }
         IconButton(onClick = actions::dismiss) {
             Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.panel_close))
@@ -213,9 +201,13 @@ private fun Greeting(suggestions: List<Suggestion>, onSuggestion: (String) -> Un
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
             suggestions.forEach { suggestion ->
-                SuggestionChip(onClick = { onSuggestion(suggestion.prompt) }, label = { Text(suggestion.label) })
+                SuggestionChip(
+                    onClick = { onSuggestion(suggestion.prompt) },
+                    label = { Text(suggestion.label, style = MaterialTheme.typography.labelLarge) },
+                    modifier = Modifier.height(ChipHeight),
+                )
             }
         }
     }
@@ -234,25 +226,9 @@ private fun Conversation(state: PanelUiState, actions: PanelActions) {
         state = listState,
         copyLabel = stringResource(R.string.panel_copy),
         onCopy = actions::copy,
-        modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+        copyLastOnly = true,
     )
-}
-
-@Composable
-private fun ToolActivityRow(activity: ToolActivity?) {
-    AnimatedVisibility(activity != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-        activity ?: return@AnimatedVisibility
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(
-                toolLabel(activity),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-    }
 }
 
 @Composable
@@ -272,12 +248,14 @@ private fun toolLabel(activity: ToolActivity): String {
     return stringResource(res, activity.summary)
 }
 
+/** The one decision in the panel with consequences, so it gets the largest type and buttons. */
 @Composable
 private fun PendingActionCard(action: PendingAction, actions: PanelActions) {
     val (icon, title) = when (action.kind) {
         ActionKind.MESSAGE -> Icons.Filled.Email to stringResource(R.string.panel_action_message_title)
         ActionKind.CALENDAR_EVENT -> Icons.Filled.DateRange to stringResource(R.string.panel_action_event_title)
     }
+    val onContainer = MaterialTheme.colorScheme.onSecondaryContainer
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -285,16 +263,21 @@ private fun PendingActionCard(action: PendingAction, actions: PanelActions) {
     ) {
         Column(Modifier.padding(Spacing.l), verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(icon, contentDescription = null, tint = onContainer)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = onContainer)
             }
-            Text(action.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s), modifier = Modifier.align(Alignment.End)) {
-                TextButton(
+            Text(action.detail, style = MaterialTheme.typography.titleLarge, color = onContainer)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.l)) {
+                OutlinedButton(
                     onClick = actions::discardAction,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
-                ) { Text(stringResource(R.string.panel_action_discard)) }
-                Button(onClick = actions::confirmAction) { Text(stringResource(R.string.panel_action_confirm)) }
+                    modifier = Modifier.weight(1f).height(LargeTouch),
+                    border = BorderStroke(1.dp, onContainer),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = onContainer),
+                ) { Text(stringResource(R.string.panel_action_discard), style = MaterialTheme.typography.titleMedium) }
+                Button(
+                    onClick = actions::confirmAction,
+                    modifier = Modifier.weight(1f).height(LargeTouch),
+                ) { Text(stringResource(R.string.panel_action_confirm), style = MaterialTheme.typography.titleMedium) }
             }
         }
     }
@@ -323,130 +306,225 @@ private fun ErrorCard(error: ChatError?, onOpenModels: () -> Unit) {
 }
 
 @Composable
-private fun VoiceStatus(state: PanelUiState, actions: PanelActions) {
-    val voice = state.voice
-    val modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
-    when {
-        state.speaking -> StatusLine(AssistantIcons.VolumeUp, stringResource(R.string.panel_speaking), modifier) {
-            TextButton(onClick = actions::stopSpeaking) { Text(stringResource(R.string.panel_stop_speaking)) }
-        }
-        voice is VoiceState.Listening -> Row(
-            modifier,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
-        ) {
-            VoiceLevelRing(voice.level, voice.hearingSpeech, size = 36.dp)
+private fun VoiceSetupCard(voice: VoiceState, onOpenSettings: () -> Unit) {
+    val text = when (voice) {
+        VoiceState.NeedsPermission -> R.string.panel_needs_mic
+        VoiceState.NeedsModel -> R.string.panel_needs_voice_model
+        else -> return
+    }
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(Spacing.l), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(if (voice.hearingSpeech) R.string.panel_hearing else R.string.panel_listening),
-                style = MaterialTheme.typography.bodyLarge,
+                stringResource(text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.weight(1f),
             )
+            FilledTonalButton(onClick = onOpenSettings) { Text(stringResource(R.string.panel_open_voice_setup)) }
         }
-        voice is VoiceState.Preparing -> StatusLine(AssistantIcons.Mic, stringResource(R.string.panel_listening), modifier)
-        voice is VoiceState.Transcribing -> Row(
-            modifier,
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
-        ) {
-            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            Text(stringResource(R.string.panel_transcribing), style = MaterialTheme.typography.bodyLarge)
-        }
-        voice is VoiceState.NeedsPermission || voice is VoiceState.NeedsModel -> Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.tertiaryContainer,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(Modifier.padding(Spacing.l), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(if (voice is VoiceState.NeedsPermission) R.string.panel_needs_mic else R.string.panel_needs_voice_model),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.weight(1f),
-                )
-                FilledTonalButton(onClick = actions::openVoiceSettings) { Text(stringResource(R.string.panel_open_voice_setup)) }
-            }
-        }
-        state.conversationMode -> StatusLine(AssistantIcons.GraphicEq, stringResource(R.string.panel_conversation_on), modifier)
     }
 }
 
+/** Settings worth changing mid-conversation, each with a label so none has to be guessed. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusLine(
-    icon: ImageVector,
-    text: String,
-    modifier: Modifier = Modifier,
-    trailing: @Composable () -> Unit = {},
-) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        trailing()
-    }
-}
-
-@Composable
-private fun Composer(state: PanelUiState, actions: PanelActions) {
-    var input by rememberSaveable { mutableStateOf("") }
-    val haptics = LocalHapticFeedback.current
-    val submit = {
-        if (input.isNotBlank()) {
-            actions.send(input)
-            input = ""
-        }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+private fun PanelToggles(state: PanelUiState, actions: PanelActions) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s), verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        ToggleChip(
+            label = stringResource(R.string.panel_conversation),
+            icon = AssistantIcons.GraphicEq,
+            selected = state.conversationMode,
+            onClick = actions::toggleConversationMode,
+        )
+        AssistChip(
+            onClick = actions::switchLanguage,
+            label = { Text(languageName(state.language), style = MaterialTheme.typography.labelLarge) },
+            leadingIcon = { Icon(AssistantIcons.Translate, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+            modifier = Modifier.height(ChipHeight),
+        )
         if (state.screenAvailable) {
-            FilterChip(
+            ToggleChip(
+                label = stringResource(R.string.panel_use_screen),
+                icon = AssistantIcons.Smartphone,
                 selected = state.screenAttached,
                 onClick = actions::toggleScreen,
-                label = { Text(stringResource(R.string.panel_use_screen)) },
-                leadingIcon = { Icon(AssistantIcons.Smartphone, contentDescription = null, modifier = Modifier.size(18.dp)) },
             )
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.panel_hint)) },
-                shape = RoundedCornerShape(28.dp),
-                maxLines = 5,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submit() }),
-                trailingIcon = if (input.isNotBlank() && !state.generating) {
-                    {
-                        IconButton(onClick = submit) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.panel_send))
-                        }
-                    }
-                } else {
-                    null
-                },
-            )
-            Spacer(Modifier.width(Spacing.xxs))
-            MainButton(state) {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                if (state.generating) actions.stopGenerating() else actions.toggleListening()
-            }
         }
     }
 }
 
-/** The round button: stops an answer while one is written, otherwise starts or stops listening. */
 @Composable
-private fun MainButton(state: PanelUiState, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(76.dp)) {
-        val voice = state.voice
-        if (voice is VoiceState.Listening) VoiceLevelRing(voice.level, voice.hearingSpeech, size = 76.dp)
-        FilledIconButton(
-            onClick = onClick,
-            modifier = Modifier.size(52.dp),
-            shape = CircleShape,
-        ) {
-            when {
-                state.generating -> Icon(AssistantIcons.Stop, contentDescription = stringResource(R.string.panel_stop))
-                state.listening -> Icon(AssistantIcons.Mic, contentDescription = stringResource(R.string.panel_stop_listening))
-                else -> Icon(AssistantIcons.Mic, contentDescription = stringResource(R.string.panel_listen))
+private fun ToggleChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+        modifier = Modifier.height(ChipHeight),
+    )
+}
+
+/** A language's own name for itself, which is how people look for it. */
+private fun languageName(tag: String): String {
+    val locale = Locale.forLanguageTag(tag)
+    return locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
+}
+
+/**
+ * The voice button with what it is doing written underneath. Typing stays one tap away rather
+ * than always on screen, so nothing competes with the button.
+ */
+@Composable
+private fun Composer(state: PanelUiState, actions: PanelActions, startTyping: Boolean) {
+    var typing by rememberSaveable { mutableStateOf(startTyping) }
+    var input by rememberSaveable { mutableStateOf("") }
+    val mode = state.voiceMode
+    val listening = state.voice as? VoiceState.Listening
+    val caption = voiceCaption(state)
+    val orbLabel = voiceActionLabel(mode)
+    val captionModifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+    VoiceHaptics(mode)
+
+    if (typing) {
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        val submit = {
+            if (input.isNotBlank()) {
+                actions.send(input)
+                input = ""
             }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+            if (mode != VoiceMode.IDLE) {
+                Text(
+                    caption,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = captionModifier,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    placeholder = { Text(stringResource(R.string.panel_hint)) },
+                    shape = RoundedCornerShape(28.dp),
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { submit() }),
+                    trailingIcon = if (input.isNotBlank() && !state.generating) {
+                        {
+                            IconButton(onClick = submit) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.panel_send))
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                )
+                VoiceOrb(
+                    mode = mode,
+                    level = listening?.level ?: 0f,
+                    hearingSpeech = listening?.hearingSpeech == true,
+                    contentDescription = orbLabel,
+                    onClick = {
+                        // Going back to the voice layout is what the microphone is for.
+                        if (mode == VoiceMode.IDLE) typing = false
+                        onVoiceTap(state, actions)
+                    },
+                    size = CompactOrbSize,
+                )
+            }
+        }
+    } else {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                FilledTonalIconButton(
+                    onClick = { typing = true },
+                    modifier = Modifier.align(Alignment.CenterStart).size(LargeTouch),
+                ) {
+                    Icon(AssistantIcons.Keyboard, contentDescription = stringResource(R.string.panel_type))
+                }
+                VoiceOrb(
+                    mode = mode,
+                    level = listening?.level ?: 0f,
+                    hearingSpeech = listening?.hearingSpeech == true,
+                    contentDescription = orbLabel,
+                    onClick = { onVoiceTap(state, actions) },
+                    size = OrbSize,
+                )
+            }
+            Text(
+                caption,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = captionModifier,
+            )
         }
     }
 }
+
+/** What a tap on the voice button does depends on what it is showing. */
+private fun onVoiceTap(state: PanelUiState, actions: PanelActions) = when (state.voiceMode) {
+    // In conversation mode the microphone is already open, so interrupting only silences the reply;
+    // toggling would end the conversation.
+    VoiceMode.SPEAKING -> if (state.conversationMode) actions.stopSpeaking() else actions.toggleListening()
+    VoiceMode.WORKING -> if (state.generating) actions.stopGenerating() else actions.toggleListening()
+    VoiceMode.IDLE, VoiceMode.LISTENING -> actions.toggleListening()
+}
+
+@Composable
+private fun voiceCaption(state: PanelUiState): String = when (state.voiceMode) {
+    VoiceMode.SPEAKING -> stringResource(R.string.panel_speaking)
+    VoiceMode.WORKING -> when {
+        state.voice is VoiceState.Transcribing -> stringResource(R.string.panel_transcribing)
+        state.toolActivity != null -> toolLabel(state.toolActivity)
+        else -> stringResource(R.string.panel_thinking)
+    }
+    VoiceMode.LISTENING -> stringResource(
+        if ((state.voice as? VoiceState.Listening)?.hearingSpeech == true) R.string.panel_hearing else R.string.panel_listening,
+    )
+    VoiceMode.IDLE -> stringResource(if (state.conversationMode) R.string.panel_conversation_on else R.string.panel_tap_to_talk)
+}
+
+@Composable
+private fun voiceActionLabel(mode: VoiceMode): String = stringResource(
+    when (mode) {
+        VoiceMode.IDLE -> R.string.panel_listen
+        VoiceMode.LISTENING -> R.string.panel_stop_listening
+        VoiceMode.WORKING -> R.string.panel_stop
+        VoiceMode.SPEAKING -> R.string.panel_interrupt
+    },
+)
+
+/** Marks the moments that matter with a vibration, so they can be felt without looking. */
+@Composable
+private fun VoiceHaptics(mode: VoiceMode) {
+    val haptics = LocalHapticFeedback.current
+    val previous = remember { mutableStateOf(mode) }
+    LaunchedEffect(mode) {
+        val before = previous.value
+        previous.value = mode
+        when {
+            mode == before -> Unit
+            mode == VoiceMode.SPEAKING -> haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            mode == VoiceMode.LISTENING -> haptics.performHapticFeedback(HapticFeedbackType.ToggleOn)
+            before == VoiceMode.LISTENING -> haptics.performHapticFeedback(HapticFeedbackType.ToggleOff)
+        }
+    }
+}
+
+// Sized for a glance and a thumb, above Material's 48 dp minimum.
+private val LargeTouch = 56.dp
+private val ChipHeight = 48.dp
+private val OrbSize = 136.dp
+private val CompactOrbSize = 72.dp

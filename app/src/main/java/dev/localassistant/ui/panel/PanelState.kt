@@ -5,6 +5,7 @@ import dev.localassistant.llm.EngineState
 import dev.localassistant.llm.UiMessage
 import dev.localassistant.tools.PendingAction
 import dev.localassistant.tools.ToolActivity
+import dev.localassistant.ui.components.VoiceMode
 import dev.localassistant.voice.VoiceState
 
 /** Everything the assistant panel shows, as one immutable snapshot. */
@@ -25,6 +26,15 @@ data class PanelUiState(
 ) {
     val isEmpty: Boolean get() = messages.isEmpty() && error == null
     val listening: Boolean get() = voice is VoiceState.Listening || voice is VoiceState.Preparing
+
+    /** The one state the voice button shows, out of flags that can be true at the same time. */
+    val voiceMode: VoiceMode get() = when {
+        // In conversation mode the microphone stays open while the reply plays, so speaking wins.
+        speaking -> VoiceMode.SPEAKING
+        voice is VoiceState.Transcribing || generating -> VoiceMode.WORKING
+        listening -> VoiceMode.LISTENING
+        else -> VoiceMode.IDLE
+    }
 }
 
 /** A tap-to-ask example shown on an empty panel; [prompt] is what gets sent. */

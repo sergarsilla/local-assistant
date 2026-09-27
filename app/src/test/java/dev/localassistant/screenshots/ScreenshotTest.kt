@@ -110,8 +110,39 @@ class ScreenshotTest {
         PanelScreen(panel.copy(engine = EngineState.NoModel, error = ChatError.NoModel, voice = VoiceState.NeedsModel), noop<PanelActions>())
     }
 
+    @Test fun panelTranscribing() = capture("panel_transcribing") {
+        PanelScreen(panel.copy(voice = VoiceState.Transcribing), noop<PanelActions>())
+    }
+
+    @Test fun panelSpeaking() = capture("panel_speaking") {
+        PanelScreen(
+            panel.copy(
+                messages = listOf(
+                    UiMessage(Role.USER, "¿Cuánto falta para llegar a Valencia?"),
+                    UiMessage(Role.ASSISTANT, "Unos 45 minutos si el tráfico sigue así."),
+                ),
+                speaking = true,
+                conversationMode = true,
+            ),
+            noop<PanelActions>(),
+        )
+    }
+
+    @Test fun panelTyping() = capture("panel_typing") {
+        PanelScreen(panel, noop<PanelActions>(), startTyping = true)
+    }
+
     @Config(qualifiers = "+night")
     @Test fun panelConversationDark() = panelConversation()
+
+    @Config(qualifiers = "+night")
+    @Test fun panelListeningDark() = panelListening()
+
+    @Config(qualifiers = "+night")
+    @Test fun panelActionDark() = panelAction()
+
+    @Config(qualifiers = "+night")
+    @Test fun panelSpeakingDark() = panelSpeaking()
 
     @Test fun homeSetup() = captureScreen("home_setup") {
         HomeScreen(
