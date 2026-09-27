@@ -1,10 +1,11 @@
-# Called from native code by name.
--keepclassmembers class * {
-    boolean onBytes(byte[]);
-}
 -keepclasseswithmembernames class * {
     native <methods>;
 }
+
+# The engine hands this callback to native code, which looks its methods up by name, so the
+# whole interface is kept rather than one signature: a minified build otherwise failed on the
+# first tool call with 'no non-static method onToolCall'.
+-keep interface dev.localassistant.llm.LlamaCppEngine$NativeCallback { *; }
 -keep class com.google.ai.edge.litertlm.** { *; }
 
 # sherpa-onnx reads its configuration objects field by field from native code, looking each one
