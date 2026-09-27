@@ -5,6 +5,7 @@ import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.os.SystemClock
 import dev.localassistant.AssistantRuntime
+import dev.localassistant.voice.AudioFocus
 import dev.localassistant.voice.ListenEvent
 import dev.localassistant.voice.Microphone
 import dev.localassistant.voice.Speaker
@@ -28,7 +29,7 @@ class EchoTest(private val context: Context, private val report: (String) -> Uni
     }
 
     private fun measure(source: Int, cancelEcho: Boolean, label: String) = runBlocking {
-        val speaker = Speaker(context, AssistantRuntime.scope) {
+        val speaker = Speaker(context, AssistantRuntime.scope, AudioFocus(context)) {
             AssistantRuntime.voiceSettings.state.value.voiceFor(it)
         }
         var selfInterruptions = 0

@@ -6,6 +6,7 @@ import com.k2fsa.sherpa.onnx.WaveReader
 import dev.localassistant.AssistantRuntime
 import dev.localassistant.llm.ChatSession
 import dev.localassistant.llm.ReplyListener
+import dev.localassistant.voice.AudioFocus
 import dev.localassistant.voice.Speaker
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -29,7 +30,7 @@ class VoicePipelineBench(private val context: Context, private val report: (Stri
         val transcribed = SystemClock.elapsedRealtime()
         report("VOICE stt_load=${sttLoaded - sttLoadStart}ms transcribe=${transcribed - sttLoaded}ms text=$text")
 
-        val speaker = Speaker(context, AssistantRuntime.scope) { AssistantRuntime.voiceSettings.state.value.voiceFor(it) }
+        val speaker = Speaker(context, AssistantRuntime.scope, AudioFocus(context)) { AssistantRuntime.voiceSettings.state.value.voiceFor(it) }
         val chat = ChatSession(AssistantRuntime.engine, AssistantRuntime.scope)
         var firstChunk = 0L
         var firstAudio = 0L

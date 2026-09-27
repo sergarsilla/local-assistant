@@ -34,9 +34,10 @@ class VoiceController(
     private val scope: CoroutineScope,
 ) {
     private val microphone = Microphone(context)
+    private val focus = AudioFocus(context)
 
     private val captures get() = dev.localassistant.AssistantRuntime.captures
-    val speaker = Speaker(context, scope) { language -> settings.state.value.voiceFor(language) }
+    val speaker = Speaker(context, scope, focus) { language -> settings.state.value.voiceFor(language) }
     private var listenJob: Job? = null
     private val captureReset = CaptureReset()
 
@@ -68,6 +69,9 @@ class VoiceController(
         val pack = readyPack() ?: return
         val prefs = settings.state.value
         listenJob?.cancel()
+        // Music loud enough to enjoy is loud enough to spoil the recording, so it is quietened
+        // for as long as the microphone is open, not only while the reply is spoken.
+        focus.hold()
         listenJob = scope.launch {
             _state.value = VoiceState.Preparing
             try {
@@ -106,6 +110,9 @@ class VoiceController(
                 }
             }
         }
+        // The hold belongs to this job however it ends. A reply it started may still be
+        // speaking, and that one holds its own.
+        listenJob?.invokeOnCompletion { focus.release() }
     }
 
     fun toggleConversation() = if (_conversation.value) stopConversation() else startConversation()
@@ -226,6 +233,7 @@ class VoiceController(
     fun close() {
         onHide()
         speaker.close()
+        focus.releaseAll()
     }
 
     private fun spokenReplyListener(): ReplyListener? {

@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 class Speaker(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val focus: AudioFocus,
     private val voices: TtsVoices = AssistantRuntime.ttsVoices,
     private val voiceFor: (String) -> VoicePack?,
 ) : AutoCloseable {
@@ -78,6 +79,9 @@ class Speaker(
         val queue = Channel<String>(Channel.UNLIMITED).also { sentences = it }
         val audio = Channel<FloatArray>(capacity = 2)
         _speaking.value = true
+        // Quietens the music before the first sample, not after it.
+        focus.hold()
+        var held = true
         val reply = scope.launch(Dispatchers.Default) {
             val first = queue.receiveCatching().getOrNull() ?: return@launch
             val pack = LanguageGuess.of(first)?.let(::installedVoice)
@@ -99,7 +103,15 @@ class Speaker(
         }
         job = reply
         // A cancelled earlier reply may finish after this one started; only the current one clears the flag.
-        reply.invokeOnCompletion { synchronized(this) { if (job === reply || job == null) _speaking.value = false } }
+        reply.invokeOnCompletion {
+            synchronized(this) {
+                if (job === reply || job == null) _speaking.value = false
+                if (held) {
+                    held = false
+                    focus.release()
+                }
+            }
+        }
     }
 
     @Synchronized
