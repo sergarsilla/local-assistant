@@ -21,6 +21,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.localassistant.AssistantRuntime
+import dev.localassistant.inAppLanguage
 import dev.localassistant.ui.MainActivity
 import dev.localassistant.ui.keyboard.VoiceKeyboard
 import dev.localassistant.ui.keyboard.VoiceKeyboardActions
@@ -67,7 +68,7 @@ class VoiceKeyboardService :
             decor.setViewTreeSavedStateRegistryOwner(this)
             decor.setViewTreeViewModelStoreOwner(this)
         }
-        return ComposeView(this).apply {
+        return ComposeView(inAppLanguage()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@VoiceKeyboardService))
             setContent {
                 AssistantTheme {

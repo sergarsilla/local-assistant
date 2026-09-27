@@ -14,6 +14,7 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
 import dev.localassistant.AssistantRuntime
+import dev.localassistant.inAppLanguage
 import dev.localassistant.R
 import dev.localassistant.assistant.AssistantService
 import dev.localassistant.ui.MainActivity
@@ -81,9 +82,10 @@ class WakeWordService : Service() {
     }
 
     private fun notification(): Notification {
+        val strings = inAppLanguage()
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, getString(R.string.wake_channel), NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ID, strings.getString(R.string.wake_channel), NotificationManager.IMPORTANCE_LOW),
         )
         val disable = PendingIntent.getService(
             this,
@@ -100,11 +102,11 @@ class WakeWordService : Service() {
         val phrase = AssistantRuntime.wakeWord.state.value.phrase.label
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle(getString(R.string.wake_notification_title, phrase))
-            .setContentText(getString(R.string.wake_notification_text))
+            .setContentTitle(strings.getString(R.string.wake_notification_title, phrase))
+            .setContentText(strings.getString(R.string.wake_notification_text))
             .setContentIntent(open)
             .setOngoing(true)
-            .addAction(Notification.Action.Builder(null, getString(R.string.wake_disable), disable).build())
+            .addAction(Notification.Action.Builder(null, strings.getString(R.string.wake_disable), disable).build())
             .build()
     }
 
