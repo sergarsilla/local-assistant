@@ -4,6 +4,9 @@ on:
   # Every branch: work branches get a real Android build before anyone opens a pull request.
   push:
   pull_request:
+  # Lets a build be started by hand, which is also the quickest way to tell a broken workflow
+  # apart from an account whose Actions quota is exhausted and silently runs nothing.
+  workflow_dispatch:
 
 jobs:
   debug-apk:
