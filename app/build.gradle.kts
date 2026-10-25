@@ -51,8 +51,10 @@ android {
         rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
     }
 
+    // The environment wins, so a leftover copy of keystore.properties.example cannot quietly
+    // send the build looking for a keystore that was never there.
     fun setting(key: String, variable: String): String? =
-        signing.getProperty(key) ?: System.getenv(variable)
+        System.getenv(variable) ?: signing.getProperty(key)
 
     signingConfigs {
         create("release") {

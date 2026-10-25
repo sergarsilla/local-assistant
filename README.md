@@ -25,7 +25,8 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
   in the background. Off by default, with a notification while it runs.
 - **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events, text
   messages and calls, finding people in your contacts if you allow it. Anything that sends or
-  creates something waits for an explicit confirmation.
+  creates something waits for an explicit confirmation. Acting reliably needs a `.litertlm`
+  model; see the note below.
 - **Searches the web only if you turn it on.** Off by default. When enabled, the model can query
   DuckDuckGo and read public HTTPS pages as text; no browser is opened. Remove the network
   permission and everything else still works.
@@ -61,7 +62,14 @@ build skips R8 and carries Compose's instrumentation. For real use, copy
 `./gradlew :app:assembleRelease`.
 
 Then open the app: the Home tab walks through setting it as the assistant, the microphone and the
-downloads. Both GGUF and LiteRT-LM models can use the phone actions.
+downloads.
+
+## Releasing
+
+Pushing a `v*` tag builds a signed APK and attaches it to a GitHub release. The signing key comes
+from the repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`;
+no key material is in the repository. The workflow fails rather than publishing an APK it could
+not sign, because an unsigned one installs nowhere.
 
 ## Code layout
 
@@ -81,9 +89,6 @@ downloads. Both GGUF and LiteRT-LM models can use the phone actions.
 
 CI builds the APK and runs both on every push; the screenshots are published as an artifact.
 
-`docs/ESTADO.md` has the current review: what works, what was fixed, what is next and how to
-verify it on the phone.
-
 ## What to expect
 
 The phone is the ceiling. Android caps how much memory one app may hold - 3.1 GiB on a Pixel 10 -
@@ -94,6 +99,13 @@ so the Models screen offers a smaller context for models that need it.
 That ceiling is also the honest limit on how clever the assistant is. Models this size get
 arithmetic wrong, lose the thread of a long conversation, and sometimes answer in the wrong
 language. The app can make them quick and private; it cannot make them larger.
+
+The same ceiling decides whether a model can act rather than only talk. LiteRT-LM constrains
+decoding against the tool schema, so a `.litertlm` model cannot emit a malformed call and the
+phone actions work. llama.cpp only offers a lazy grammar: it keeps a call well formed once the
+model has started one, but it cannot make the model start one, and small GGUF models write prose
+instead — measured here with the same Gemma 4 E2B weights in both formats. Treat GGUF models as
+good for chatting and unreliable for acting.
 
 Known gaps: speaking over the assistant to interrupt it needs echo cancellation that is not
 written yet, so interrupting is a tap; the Tensor NPU needs a dispatch library built separately;
