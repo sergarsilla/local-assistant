@@ -159,7 +159,10 @@ class BenchmarkActivity : Activity() {
         intent.getStringExtra("activate")?.let {
             AssistantRuntime.models.setActive(it)
             AssistantRuntime.engine.releaseNow()
-            return finishWith("activated $it")
+            // Marks the results file, so every measurement below it says which model produced it.
+            report("MODEL $it")
+            finish()
+            return
         }
         val modelName = intent.getStringExtra("model") ?: return finishWith("missing model extra")
         val backendName = intent.getStringExtra("backend") ?: "cpu"

@@ -16,6 +16,9 @@ class ToolTest(private val context: Context, private val report: (String) -> Uni
             tools = AssistantRuntime.tools,
             history = AssistantRuntime.history,
         )
+        // The registry keeps the last tool it ran, so without this every question inherits the
+        // previous one's tool and a model that called nothing looks like it called maps.
+        AssistantRuntime.tools.clearActivity()
         val start = SystemClock.elapsedRealtime()
         var seenTool: String? = null
         chat.send(question)
