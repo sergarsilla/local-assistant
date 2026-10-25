@@ -175,6 +175,9 @@ class ScreenshotTest {
     }
 
     @Config(qualifiers = "+night")
+    @Test fun homeSetupDark() = homeSetup()
+
+    @Config(qualifiers = "+night")
     @Test fun homeReadyDark() = homeReady()
 
     @Test fun models() = captureScreen("models") {

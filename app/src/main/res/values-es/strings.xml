@@ -14,6 +14,9 @@
     <string name="home_subtitle">Un asistente privado que funciona en este móvil, incluso sin conexión.</string>
     <string name="home_setup_title">Vamos a dejarlo listo</string>
     <string name="home_setup_progress">%1$d de %2$d pasos hechos</string>
+    <string name="home_progress_fraction">%1$d/%2$d</string>
+    <string name="home_next">Siguiente: %1$s</string>
+    <string name="home_all_done">Todo hecho</string>
     <string name="home_ready_title">Todo listo</string>
     <string name="home_ready_body">Desliza hacia arriba desde una esquina inferior para abrirlo encima de cualquier app. En los móviles que lo ofrecen, mantener pulsado el botón de encendido también vale.</string>
     <string name="home_ready_model">Modelo: %1$s</string>
