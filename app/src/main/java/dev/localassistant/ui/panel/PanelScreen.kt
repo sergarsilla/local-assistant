@@ -81,6 +81,7 @@ import dev.localassistant.ui.components.VoiceMode
 import dev.localassistant.ui.components.VoiceOrb
 import dev.localassistant.ui.components.displayModelName
 import dev.localassistant.ui.theme.AssistantIcons
+import dev.localassistant.ui.theme.LargeTouch
 import dev.localassistant.ui.theme.Spacing
 import dev.localassistant.voice.VoiceState
 import java.util.Locale
@@ -524,7 +525,6 @@ private fun VoiceHaptics(mode: VoiceMode) {
 }
 
 // Sized for a glance and a thumb, above Material's 48 dp minimum.
-private val LargeTouch = 56.dp
 private val ChipHeight = 48.dp
 private val OrbSize = 136.dp
 private val CompactOrbSize = 72.dp

@@ -4,9 +4,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.localassistant.ui.theme.LargeTouch
 import dev.localassistant.ui.theme.Spacing
 
 /**
@@ -88,7 +91,10 @@ fun ActionRow(
     )
 }
 
-/** Shown instead of an empty list, saying what would be here and how to get it. */
+/**
+ * Shown instead of an empty list: what would be here, and the one thing to do about it. An
+ * empty screen that only says it is empty leaves the user to guess what comes next.
+ */
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -99,7 +105,7 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(Spacing.xxl),
+        modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.l, vertical = Spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.m),
     ) {
@@ -108,18 +114,20 @@ fun EmptyState(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(Spacing.l).size(32.dp),
+                modifier = Modifier.padding(Spacing.l).size(36.dp),
             )
         }
-        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(
             body,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         if (actionLabel != null && onAction != null) {
-            FilledTonalButton(onClick = onAction) { Text(actionLabel) }
+            Button(onClick = onAction, modifier = Modifier.padding(top = Spacing.s).height(LargeTouch)) {
+                Text(actionLabel, style = MaterialTheme.typography.titleSmall)
+            }
         }
     }
 }

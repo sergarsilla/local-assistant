@@ -42,3 +42,6 @@ object Spacing {
     /** Horizontal padding of full-width screen content. */
     val screen = 16.dp
 }
+
+/** Sized for a glance and a thumb, above Material's 48 dp minimum. */
+val LargeTouch = 56.dp
