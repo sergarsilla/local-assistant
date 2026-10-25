@@ -1,6 +1,7 @@
 package dev.localassistant.llm
 
 import android.util.Log
+import dev.localassistant.AssistantRuntime
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.AssistantTool
 import dev.localassistant.tools.ToolRegistry
@@ -56,6 +57,8 @@ class ChatSession(
     private val scope: CoroutineScope,
     private val tools: ToolRegistry? = null,
     private val history: ConversationStore? = null,
+    /** The language the user picked, so the model is told it rather than left to infer it. */
+    private val language: () -> String = { AssistantRuntime.voiceSettings.state.value.language },
 ) {
     /**
      * Returns the on-screen text to hand the model along with a question, or null. Set by the
@@ -299,7 +302,12 @@ class ChatSession(
             Role.SYSTEM,
             buildString {
                 append("You are a private assistant running entirely on the user's Android phone. ")
-                append("Reply in the language the user used, matching Spanish with Spanish and English with English. ")
+                // Naming the language beats asking a small model to infer it: Gemma 4 E2B kept
+                // answering a Spanish question in English when told only to mirror the user.
+                when (language()) {
+                    "es" -> append("Responde siempre en español. ")
+                    else -> append("Always reply in English. ")
+                }
 
                 append("Answer in one or two short sentences. Replies are usually read aloud, often while driving, ")
                 append("so lead with the answer itself and leave out preamble, restating the question, and offers of ")
