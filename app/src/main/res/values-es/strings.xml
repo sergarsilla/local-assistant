@@ -106,11 +106,16 @@
 
     <!-- Chats -->
     <string name="history_title">Chats</string>
+    <string name="history_subtitle">Abre una conversación para seguir donde la dejaste.</string>
     <string name="history_search_hint">Buscar conversaciones</string>
     <string name="history_empty_title">Aún no hay conversaciones</string>
     <string name="history_empty">Lo que le preguntes al asistente se guarda aquí, solo en este móvil.</string>
+    <string name="history_empty_saving_off">El guardado está desactivado, así que aquí no se conserva nada. Vuelve a activarlo en Ajustes.</string>
     <string name="history_no_results">Ninguna conversación coincide.</string>
+    <string name="history_no_results_body">Prueba con una palabra más corta o borra la búsqueda para verlas todas.</string>
+    <string name="history_clear_search">Borrar la búsqueda</string>
     <string name="history_saving_off">El guardado está desactivado: las conversaciones nuevas no se guardan.</string>
+    <string name="history_manage">Guardado en este móvil</string>
     <string name="history_today">Hoy</string>
     <string name="history_yesterday">Ayer</string>
     <string name="history_this_week">Esta semana</string>
@@ -126,6 +131,7 @@
     <!-- Models -->
     <string name="models_free_space">%1$s libres en este móvil</string>
     <string name="models_installed">En este móvil</string>
+    <string name="models_active">Activo</string>
     <string name="models_empty_title">Aún no hay modelos</string>
     <string name="models_empty_body">Descarga uno recomendado más abajo o importa un archivo .gguf o .litertlm.</string>
     <string name="models_delete">Borrar</string>
@@ -142,6 +148,7 @@
     <string name="models_no_space">No hay espacio suficiente para este.</string>
     <string name="models_transfers">En curso</string>
     <string name="models_transfer_failed">Error: %1$s</string>
+    <string name="models_progress">%1$s de %2$s</string>
     <string name="models_retry">Reintentar</string>
     <string name="models_dismiss">Descartar</string>
     <string name="models_search_title">Buscar en Hugging Face</string>
@@ -164,6 +171,7 @@
     <string name="download_notification_title">Descargando %1$s</string>
 
     <!-- Settings -->
+    <string name="settings_subtitle">Configura lo que puede oír, decir y leer.</string>
     <string name="settings_assistant">Asistente</string>
     <string name="settings_default_assistant">App de asistente digital</string>
     <string name="setup_status_active">Asistente local es el asistente actual.</string>
@@ -203,6 +211,7 @@
     <string name="settings_wake_title">Palabra de activación</string>
     <string name="settings_wake_summary">Escucha en segundo plano la frase de abajo y abre el asistente. Gasta algo de batería; se muestra una notificación mientras está activa.</string>
     <string name="settings_wake_unavailable">Necesita el micrófono y que Asistente local sea el asistente digital.</string>
+    <string name="settings_accel">Dónde se ejecuta</string>
     <string name="settings_model">Modelo</string>
     <string name="settings_accel_gpu">GPU</string>
     <string name="settings_accel_gpu_note">Empieza antes las preguntas largas, pero escribe la respuesta más despacio. Vuelve a la CPU si la GPU falla.</string>
@@ -224,6 +233,7 @@
     <string name="settings_contacts_off">Opcional. Permite que los mensajes y llamadas encuentren números por el nombre.</string>
     <string name="setup_language">Idioma de la app</string>
     <string name="setup_language_system">Idioma del sistema</string>
+    <string name="settings_about">Acerca de</string>
     <string name="settings_about_privacy">Sin analíticas, sin cuentas, sin servidores</string>
     <string name="settings_about_body">La voz, el texto y el historial se procesan en este móvil. Apache 2.0.</string>
     <string name="settings_version">Versión %1$s</string>
