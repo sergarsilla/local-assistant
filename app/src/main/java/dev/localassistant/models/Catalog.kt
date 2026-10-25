@@ -27,6 +27,11 @@ data class CatalogEntry(val title: String, val noteRes: Int, val file: RemoteMod
 object Catalog {
     val recommended = listOf(
         CatalogEntry(
+            "Qwen3 1.7B",
+            R.string.catalog_note_qwen3_1_7b,
+            RemoteModelFile("Qwen/Qwen3-1.7B-GGUF", "Qwen3-1.7B-Q8_0.gguf", 1_834_426_016),
+        ),
+        CatalogEntry(
             "Gemma 4 E2B",
             R.string.catalog_note_gemma_e2b_litert,
             RemoteModelFile("litert-community/gemma-4-E2B-it-litert-lm", "gemma-4-E2B-it.litertlm", 2_588_147_712),
@@ -48,6 +53,10 @@ object Catalog {
         ),
     )
 
-    /** What first-run setup downloads: fast, good in Spanish and English, and able to use tools. */
+    /**
+     * What first-run setup downloads. Acting on the phone is the point of the app, and measuring
+     * the same question ten times put Qwen3 1.7B at ten tool calls out of ten against two for
+     * Gemma 4 E2B, which usually answers that it is opening maps and then does nothing.
+     */
     val default: CatalogEntry get() = recommended.first()
 }

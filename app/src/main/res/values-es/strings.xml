@@ -37,7 +37,7 @@
     <string name="step_speech_title">Reconocimiento de voz</string>
     <string name="step_speech_body">Parakeet entiende español e inglés sin conexión</string>
     <string name="step_model_title">Modelo de lenguaje</string>
-    <string name="step_model_body">Gemma 4 E2B, el cerebro recomendado</string>
+    <string name="step_model_body">%1$s, el cerebro recomendado</string>
     <string name="step_voice_title">Respuestas habladas</string>
     <string name="step_voice_body">Una voz para leer las respuestas en alto</string>
     <string name="step_screen_title">Leer la pantalla</string>
@@ -155,10 +155,11 @@
     <string name="models_network_open_settings">Abrir permisos de la app</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
-    <string name="catalog_note_gemma_e2b_litert">Por defecto. Rápido, bueno en español e inglés y capaz de leer imágenes; funciona en la GPU.</string>
+    <string name="catalog_note_qwen3_1_7b">Por defecto. El que de verdad actúa en el móvil: temporizadores, mapas, mensajes.</string>
+    <string name="catalog_note_gemma_e2b_litert">El más rápido, y el único que lee imágenes. A menudo dice que actúa sin hacerlo.</string>
     <string name="catalog_note_gemma_e4b_litert">Más listo y más lento. Necesita más memoria.</string>
     <string name="catalog_note_gemma_e2b_gguf">El mismo modelo en GGUF, para comparar con llama.cpp.</string>
-    <string name="catalog_note_qwen3_4b">Razona bien y es bueno en muchos idiomas.</string>
+    <string name="catalog_note_qwen3_4b">Razona bien, pero un modelo de 4B va lento en un móvil: unos 2 tokens por segundo aquí.</string>
     <string name="download_channel">Descargas de modelos</string>
     <string name="download_notification_title">Descargando %1$s</string>
 

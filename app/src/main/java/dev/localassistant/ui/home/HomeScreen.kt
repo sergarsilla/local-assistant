@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
+import dev.localassistant.models.Catalog
 import dev.localassistant.ui.components.CardNote
 import dev.localassistant.ui.components.GroupCard
 import dev.localassistant.ui.components.ScreenHeader
@@ -299,7 +300,7 @@ private fun SetupStep.texts(): StepTexts = when (id) {
     )
     StepId.LANGUAGE_MODEL -> StepTexts(
         stringResource(R.string.step_model_title),
-        stringResource(R.string.step_model_body),
+        stringResource(R.string.step_model_body, Catalog.default.title),
         stringResource(R.string.models_download),
     )
     StepId.VOICE -> StepTexts(

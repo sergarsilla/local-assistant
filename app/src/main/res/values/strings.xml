@@ -37,7 +37,7 @@
     <string name="step_speech_title">Speech recognition</string>
     <string name="step_speech_body">Parakeet understands Spanish and English offline</string>
     <string name="step_model_title">Language model</string>
-    <string name="step_model_body">Gemma 4 E2B, the recommended brain</string>
+    <string name="step_model_body">%1$s, the recommended brain</string>
     <string name="step_voice_title">Spoken replies</string>
     <string name="step_voice_body">A voice to read answers aloud</string>
     <string name="step_screen_title">Read the screen</string>
@@ -155,10 +155,11 @@
     <string name="models_network_open_settings">Open app permissions</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
-    <string name="catalog_note_gemma_e2b_litert">Default. Fast, good in Spanish and English, can read images; runs on the GPU.</string>
+    <string name="catalog_note_qwen3_1_7b">Default. The one that reliably acts on the phone: timers, maps, messages.</string>
+    <string name="catalog_note_gemma_e2b_litert">The fastest, and the only one that reads images. Often says it is acting without acting.</string>
     <string name="catalog_note_gemma_e4b_litert">Smarter and slower. Needs more memory.</string>
     <string name="catalog_note_gemma_e2b_gguf">The same model as GGUF, to compare with llama.cpp.</string>
-    <string name="catalog_note_qwen3_4b">Reasons well and is strong in many languages.</string>
+    <string name="catalog_note_qwen3_4b">Reasons well, but a 4B model is slow on a phone: about 2 tokens a second here.</string>
     <string name="download_channel">Model downloads</string>
     <string name="download_notification_title">Downloading %1$s</string>
 

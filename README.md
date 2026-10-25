@@ -25,7 +25,7 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
   in the background. Off by default, with a notification while it runs.
 - **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events, text
   messages and calls, finding people in your contacts if you allow it. Anything that sends or
-  creates something waits for an explicit confirmation. Acting reliably needs a `.litertlm`
+  creates something waits for an explicit confirmation. How reliably this works depends on the
   model; see the note below.
 - **Searches the web only if you turn it on.** Off by default. When enabled, the model can query
   DuckDuckGo and read public HTTPS pages as text; no browser is opened. Remove the network
@@ -100,12 +100,14 @@ That ceiling is also the honest limit on how clever the assistant is. Models thi
 arithmetic wrong, lose the thread of a long conversation, and sometimes answer in the wrong
 language. The app can make them quick and private; it cannot make them larger.
 
-The same ceiling decides whether a model can act rather than only talk. LiteRT-LM constrains
-decoding against the tool schema, so a `.litertlm` model cannot emit a malformed call and the
-phone actions work. llama.cpp only offers a lazy grammar: it keeps a call well formed once the
-model has started one, but it cannot make the model start one, and small GGUF models write prose
-instead — measured here with the same Gemma 4 E2B weights in both formats. Treat GGUF models as
-good for chatting and unreliable for acting.
+Whether a model acts rather than only talks is a property of the model, not of the format. Asking
+the same question ten times, Qwen3 1.7B called the right tool ten times out of ten, while Gemma 4
+E2B managed two and otherwise answered that it was opening maps without opening anything — the
+worst way to fail, because nothing looks wrong. Qwen3 1.7B is what first-run setup downloads for
+that reason, even though Gemma is almost twice as fast and the only one here that reads images.
+
+Uncensoring a model appears to cost it that ability: the abliterated Qwen3 1.7B writes
+`Open_maps destination=...` as plain prose where the base model emits a real call.
 
 Known gaps: speaking over the assistant to interrupt it needs echo cancellation that is not
 written yet, so interrupting is a tap; the Tensor NPU needs a dispatch library built separately;
