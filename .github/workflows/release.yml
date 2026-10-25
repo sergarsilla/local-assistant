@@ -6,6 +6,13 @@ on:
   push:
     tags:
       - 'v*'
+  # Pushing a tag does not always start this run, so the same build can be asked for by hand
+  # against a tag that already exists.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to build and publish
+        required: true
 
 permissions:
   contents: write
@@ -17,6 +24,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-java@v5
         with:
@@ -58,3 +66,4 @@ jobs:
         with:
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
+          tag_name: ${{ inputs.tag || github.ref_name }}
