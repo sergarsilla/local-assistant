@@ -30,8 +30,15 @@ class ModelStore(context: Context) {
     private val _activeName = MutableStateFlow(prefs.getString(KEY_ACTIVE, null))
     val activeName: StateFlow<String?> = _activeName.asStateFlow()
 
+    /**
+     * The model the assistant answers with. With none chosen, or after the chosen one is
+     * deleted, it falls back to the quickest one that has been timed rather than whichever
+     * sorts first: a phone this size holds models that differ tenfold in speed, and landing on
+     * the slowest of them by alphabet is a poor first impression.
+     */
     val active: InstalledModel?
-        get() = installed.value.firstOrNull { it.name == activeName.value } ?: installed.value.firstOrNull()
+        get() = installed.value.firstOrNull { it.name == activeName.value }
+            ?: installed.value.maxByOrNull { it.tokensPerSecond ?: 0.0 }
 
     fun refresh() {
         _installed.value = scan()
