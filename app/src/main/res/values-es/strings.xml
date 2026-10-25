@@ -126,6 +126,7 @@
     <!-- Models -->
     <string name="models_free_space">%1$s libres en este móvil</string>
     <string name="models_installed">En este móvil</string>
+    <string name="models_active">Activo</string>
     <string name="models_empty_title">Aún no hay modelos</string>
     <string name="models_empty_body">Descarga uno recomendado más abajo o importa un archivo .gguf o .litertlm.</string>
     <string name="models_delete">Borrar</string>
@@ -142,6 +143,7 @@
     <string name="models_no_space">No hay espacio suficiente para este.</string>
     <string name="models_transfers">En curso</string>
     <string name="models_transfer_failed">Error: %1$s</string>
+    <string name="models_progress">%1$s de %2$s</string>
     <string name="models_retry">Reintentar</string>
     <string name="models_dismiss">Descartar</string>
     <string name="models_search_title">Buscar en Hugging Face</string>

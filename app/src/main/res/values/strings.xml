@@ -126,6 +126,7 @@
     <!-- Models -->
     <string name="models_free_space">%1$s free on this phone</string>
     <string name="models_installed">On this phone</string>
+    <string name="models_active">Active</string>
     <string name="models_empty_title">No models yet</string>
     <string name="models_empty_body">Download a recommended one below or import a .gguf or .litertlm file.</string>
     <string name="models_delete">Delete</string>
@@ -142,6 +143,7 @@
     <string name="models_no_space">Not enough free space for this one.</string>
     <string name="models_transfers">In progress</string>
     <string name="models_transfer_failed">Failed: %1$s</string>
+    <string name="models_progress">%1$s of %2$s</string>
     <string name="models_retry">Retry</string>
     <string name="models_dismiss">Dismiss</string>
     <string name="models_search_title">Search Hugging Face</string>
