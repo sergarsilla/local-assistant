@@ -106,11 +106,16 @@
 
     <!-- Chats -->
     <string name="history_title">Chats</string>
+    <string name="history_subtitle">Abre una conversación para seguir donde la dejaste.</string>
     <string name="history_search_hint">Buscar conversaciones</string>
     <string name="history_empty_title">Aún no hay conversaciones</string>
     <string name="history_empty">Lo que le preguntes al asistente se guarda aquí, solo en este móvil.</string>
+    <string name="history_empty_saving_off">El guardado está desactivado, así que aquí no se conserva nada. Vuelve a activarlo en Ajustes.</string>
     <string name="history_no_results">Ninguna conversación coincide.</string>
+    <string name="history_no_results_body">Prueba con una palabra más corta o borra la búsqueda para verlas todas.</string>
+    <string name="history_clear_search">Borrar la búsqueda</string>
     <string name="history_saving_off">El guardado está desactivado: las conversaciones nuevas no se guardan.</string>
+    <string name="history_manage">Guardado en este móvil</string>
     <string name="history_today">Hoy</string>
     <string name="history_yesterday">Ayer</string>
     <string name="history_this_week">Esta semana</string>

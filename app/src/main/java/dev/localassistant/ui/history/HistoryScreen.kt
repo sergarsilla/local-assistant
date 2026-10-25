@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,11 +37,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
 import dev.localassistant.history.ConversationSummary
+import dev.localassistant.ui.components.CardNote
 import dev.localassistant.ui.components.ChatMessageList
 import dev.localassistant.ui.components.ConfirmDialog
 import dev.localassistant.ui.components.EmptyState
-import dev.localassistant.ui.components.SectionHeader
+import dev.localassistant.ui.components.GroupCard
+import dev.localassistant.ui.components.MetaText
+import dev.localassistant.ui.components.ScreenHeader
 import dev.localassistant.ui.theme.AssistantIcons
+import dev.localassistant.ui.theme.LargeTouch
 import dev.localassistant.ui.theme.Spacing
 
 interface HistoryActions {
@@ -89,72 +93,109 @@ fun HistoryScreen(state: HistoryUiState, actions: HistoryActions, modifier: Modi
     }
 }
 
+/**
+ * Past conversations, newest first, in a card per day bucket: the same shape a chat app uses, so
+ * "what did I ask yesterday" is one glance rather than a scroll.
+ */
 @Composable
 private fun ListScreen(state: HistoryUiState, actions: HistoryActions, modifier: Modifier) {
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Spacing.xl)) {
+    LazyColumn(
+        modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = Spacing.screen, end = Spacing.screen, bottom = Spacing.xxl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.m),
+    ) {
         item {
-            Column(Modifier.padding(horizontal = Spacing.screen, vertical = Spacing.l), verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                Text(stringResource(R.string.history_title), style = MaterialTheme.typography.headlineMedium)
-                if (!state.saving) SavingOffNotice(actions::openSettings)
-                if (state.hasConversations) {
-                    OutlinedTextField(
-                        value = state.query,
-                        onValueChange = actions::setQuery,
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        placeholder = { Text(stringResource(R.string.history_search_hint)) },
-                    )
-                }
-            }
+            ScreenHeader(stringResource(R.string.history_title), subtitle = stringResource(R.string.history_subtitle))
         }
         if (!state.hasConversations) {
-            item {
-                EmptyState(
-                    icon = AssistantIcons.Chat,
-                    title = stringResource(R.string.history_empty_title),
-                    body = stringResource(R.string.history_empty),
-                )
-            }
-        } else if (state.groups.isEmpty()) {
-            item {
-                Text(
-                    stringResource(R.string.history_no_results),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.screen),
-                )
-            }
-        }
-        state.groups.forEach { group ->
-            item(key = "s:${group.section}") { SectionHeader(stringResource(group.section.label())) }
-            items(group.conversations, key = { it.id }) { conversation -> ConversationRow(conversation, actions) }
-        }
-        if (state.hasConversations) {
-            item {
-                TextButton(onClick = actions::requestDeleteAll, modifier = Modifier.padding(horizontal = Spacing.s, vertical = Spacing.l)) {
-                    Text(stringResource(R.string.history_delete_all), color = MaterialTheme.colorScheme.error)
+            item { EmptyHistory(state.saving, actions::openSettings) }
+        } else {
+            if (!state.saving) item { SavingOffCard(actions::openSettings) }
+            item { SearchField(state.query, actions::setQuery) }
+            if (state.groups.isEmpty()) item { NoResults { actions.setQuery("") } }
+            state.groups.forEach { group ->
+                item(key = "g:${group.section}") {
+                    GroupCard(stringResource(group.section.label())) {
+                        group.conversations.forEach { conversation -> ConversationRow(conversation, actions) }
+                    }
                 }
             }
-        }
-        item {
-            Text(
-                stringResource(R.string.history_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.screen),
-            )
+            item { ManageCard(actions::requestDeleteAll) }
         }
     }
 }
 
+/** Nothing saved yet. With saving switched off that is the reason, and the fix is one tap away. */
 @Composable
-private fun SavingOffNotice(onOpenSettings: () -> Unit) {
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Row(Modifier.padding(start = Spacing.l, end = Spacing.s), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.history_saving_off), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+private fun EmptyHistory(saving: Boolean, onOpenSettings: () -> Unit) {
+    EmptyState(
+        icon = AssistantIcons.Chat,
+        title = stringResource(R.string.history_empty_title),
+        body = stringResource(if (saving) R.string.history_empty else R.string.history_empty_saving_off),
+        actionLabel = if (saving) null else stringResource(R.string.tab_settings),
+        onAction = if (saving) null else onOpenSettings,
+    )
+}
+
+@Composable
+private fun NoResults(onClear: () -> Unit) {
+    EmptyState(
+        icon = Icons.Filled.Search,
+        title = stringResource(R.string.history_no_results),
+        body = stringResource(R.string.history_no_results_body),
+        actionLabel = stringResource(R.string.history_clear_search),
+        onAction = onClear,
+    )
+}
+
+@Composable
+private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        placeholder = { Text(stringResource(R.string.history_search_hint)) },
+    )
+}
+
+@Composable
+private fun SavingOffCard(onOpenSettings: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            Modifier.padding(start = Spacing.l, end = Spacing.s, top = Spacing.s, bottom = Spacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.history_saving_off),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
             TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.tab_settings)) }
         }
+    }
+}
+
+/** Where the conversations live and the one way to empty it, kept apart from the list itself. */
+@Composable
+private fun ManageCard(onDeleteAll: () -> Unit) {
+    GroupCard(stringResource(R.string.history_manage), icon = AssistantIcons.History) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(onClick = onDeleteAll),
+            leadingContent = {
+                Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            },
+            headlineContent = {
+                Text(stringResource(R.string.history_delete_all), color = MaterialTheme.colorScheme.error)
+            },
+        )
+        CardNote(stringResource(R.string.history_note))
     }
 }
 
@@ -165,8 +206,8 @@ private fun ConversationRow(conversation: ConversationSummary, actions: HistoryA
         modifier = Modifier.clickable { actions.open(conversation) },
         headlineContent = { Text(conversation.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
-            Text(
-                "${DateUtils.getRelativeTimeSpanString(conversation.startedAt)} · " +
+            MetaText(
+                DateUtils.getRelativeTimeSpanString(conversation.startedAt).toString() + " · " +
                     pluralStringResource(R.plurals.history_messages, conversation.messageCount, conversation.messageCount),
             )
         },
@@ -203,7 +244,7 @@ private fun DetailScreen(detail: ConversationDetail, actions: HistoryActions, mo
         Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = { actions.continueConversation(detail.summary) },
-                modifier = Modifier.fillMaxWidth().padding(Spacing.l),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.l).height(LargeTouch),
             ) {
                 Icon(AssistantIcons.Sparkle, contentDescription = null)
                 Text(stringResource(R.string.history_continue), modifier = Modifier.padding(start = Spacing.s))

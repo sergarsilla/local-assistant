@@ -106,11 +106,16 @@
 
     <!-- Chats -->
     <string name="history_title">Chats</string>
+    <string name="history_subtitle">Open a conversation to carry on where you left off.</string>
     <string name="history_search_hint">Search conversations</string>
     <string name="history_empty_title">No conversations yet</string>
     <string name="history_empty">What you ask the assistant is kept here, on this phone only.</string>
+    <string name="history_empty_saving_off">Saving is off, so nothing is kept here. Turn it back on in Settings.</string>
     <string name="history_no_results">No conversation matches.</string>
+    <string name="history_no_results_body">Try a shorter word, or clear the search to see them all.</string>
+    <string name="history_clear_search">Clear search</string>
     <string name="history_saving_off">Saving is off: new conversations are not kept.</string>
+    <string name="history_manage">Kept on this phone</string>
     <string name="history_today">Today</string>
     <string name="history_yesterday">Yesterday</string>
     <string name="history_this_week">This week</string>
