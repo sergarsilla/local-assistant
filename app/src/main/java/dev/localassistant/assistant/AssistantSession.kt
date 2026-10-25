@@ -119,9 +119,10 @@ class AssistantSession(context: Context) :
         // Loading the model and the voices saturates every core for over a second. Started here
         // they compete with the panel's own first frames, so they wait until it is on screen:
         // the user is still reading it, and nothing they can do needs the model this soon.
+        val willListen = byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen
         afterFirstFrame {
             AssistantRuntime.engine.preload(chat::preface)
-            voice.preload()
+            voice.preload(imminent = willListen)
         }
         // Sending the user to another app means getting out of their way; a timer does not.
         AssistantRuntime.tools.activityStarter = { intent, leavesPanel ->
@@ -129,7 +130,7 @@ class AssistantSession(context: Context) :
             // Tools run on the model's thread; the session is only touched on the main one.
             if (leavesPanel) mainHandler.post { hide() }
         }
-        if (byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen) voice.startListening()
+        if (willListen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
         logFirstFrame()

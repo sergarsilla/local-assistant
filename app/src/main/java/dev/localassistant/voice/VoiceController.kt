@@ -55,10 +55,19 @@ class VoiceController(
     fun setLanguage(language: String) = settings.update { it.copy(language = language) }
 
     /** Called when the panel opens: gets the recognizer ready before the user speaks. */
-    fun preload() {
+    /**
+     * Gets the voice ready, but only when the user is about to use it. The recogniser is 670 MB
+     * and a voice up to 190 MB, against the 3.1 GiB Android lets this app hold in total, so a
+     * session where the user only types would otherwise spend a third of the budget on models it
+     * never touches, and the language model pays for it.
+     *
+     * [imminent] is true when the panel is already opening the microphone. When it is false the
+     * recogniser waits until the microphone is actually tapped, which costs a few seconds once.
+     */
+    fun preload(imminent: Boolean) {
         val prefs = settings.state.value
-        prefs.activeSpeechToText?.let(holder::preload)
-        if (prefs.speakReplies) speaker.preload(prefs.language)
+        if (imminent) prefs.activeSpeechToText?.let(holder::preload)
+        if (imminent && prefs.speakReplies) speaker.preload(prefs.language)
     }
 
     fun toggleListening() = if (listenJob?.isActive == true) stopListening() else startListening()
@@ -108,6 +117,10 @@ class VoiceController(
                 if (_state.value !is VoiceState.NeedsPermission && _state.value !is VoiceState.NeedsModel) {
                     _state.value = VoiceState.Idle
                 }
+                // The turn is over however it ended, so the recogniser's 670 MB go back to the
+                // language model, which is about to answer and has the same budget to live in.
+                // Conversation mode keeps it: it listens again the moment the reply ends.
+                if (!_conversation.value) holder.scheduleRelease(HANDOVER_DELAY_MS)
             }
         }
         // The hold belongs to this job however it ends. A reply it started may still be
@@ -247,6 +260,9 @@ class VoiceController(
     }
 
     private companion object {
+        /** Long enough that tapping the microphone straight again does not reload it. */
+        const val HANDOVER_DELAY_MS = 2_000L
+
         const val TAG = "VoiceController"
         const val MIN_UTTERANCE_MS = 400
         const val MIN_UTTERANCE_LEVEL = 0.01f
