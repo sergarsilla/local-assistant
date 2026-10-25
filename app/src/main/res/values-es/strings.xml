@@ -170,6 +170,7 @@
     <string name="download_notification_title">Descargando %1$s</string>
 
     <!-- Settings -->
+    <string name="settings_subtitle">Configura lo que puede oír, decir y leer.</string>
     <string name="settings_assistant">Asistente</string>
     <string name="settings_default_assistant">App de asistente digital</string>
     <string name="setup_status_active">Asistente local es el asistente actual.</string>
@@ -209,6 +210,7 @@
     <string name="settings_wake_title">Palabra de activación</string>
     <string name="settings_wake_summary">Escucha en segundo plano la frase de abajo y abre el asistente. Gasta algo de batería; se muestra una notificación mientras está activa.</string>
     <string name="settings_wake_unavailable">Necesita el micrófono y que Asistente local sea el asistente digital.</string>
+    <string name="settings_accel">Dónde se ejecuta</string>
     <string name="settings_model">Modelo</string>
     <string name="settings_accel_gpu">GPU</string>
     <string name="settings_accel_gpu_note">Empieza antes las preguntas largas, pero escribe la respuesta más despacio. Vuelve a la CPU si la GPU falla.</string>
@@ -230,6 +232,7 @@
     <string name="settings_contacts_off">Opcional. Permite que los mensajes y llamadas encuentren números por el nombre.</string>
     <string name="setup_language">Idioma de la app</string>
     <string name="setup_language_system">Idioma del sistema</string>
+    <string name="settings_about">Acerca de</string>
     <string name="settings_about_privacy">Sin analíticas, sin cuentas, sin servidores</string>
     <string name="settings_about_body">La voz, el texto y el historial se procesan en este móvil. Apache 2.0.</string>
     <string name="settings_version">Versión %1$s</string>
