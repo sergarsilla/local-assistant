@@ -280,6 +280,5 @@
     <string name="settings_network_off">Blocked. Everything works except downloads and web search.</string>
     <string name="settings_permissions_manage">Manage in system settings</string>
     <string name="settings_permissions_manage_note">Revoke a permission, or allow one you denied before.</string>
-    <string name="catalog_note_qwen35_2b">A newer generation of the default. Not measured on this phone yet: try it and compare.</string>
-    <string name="catalog_note_qwen35_4b">The larger one. Likely the best answers that fit, and likely slow: a 4B model ran at about 2 tokens a second here.</string>
+    <string name="catalog_note_lfm25_2_6b">The best-written answers of those measured here, but it thinks before replying: 10 to 60 seconds. It does not act on the phone.</string>
 </resources>

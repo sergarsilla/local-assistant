@@ -280,6 +280,5 @@
     <string name="settings_network_off">Bloqueada. Todo funciona salvo las descargas y la búsqueda en internet.</string>
     <string name="settings_permissions_manage">Gestionar en los ajustes del sistema</string>
     <string name="settings_permissions_manage_note">Quita un permiso, o concede uno que denegaste antes.</string>
-    <string name="catalog_note_qwen35_2b">Una generación más nueva que el modelo por defecto. Aún sin medir en este móvil: pruébalo y compara.</string>
-    <string name="catalog_note_qwen35_4b">El grande. Seguramente las mejores respuestas que caben, y seguramente lento: un modelo de 4B iba a unos 2 tokens por segundo aquí.</string>
+    <string name="catalog_note_lfm25_2_6b">Las respuestas mejor escritas de los medidos aquí, pero piensa antes de contestar: de 10 a 60 segundos. No actúa en el móvil.</string>
 </resources>
