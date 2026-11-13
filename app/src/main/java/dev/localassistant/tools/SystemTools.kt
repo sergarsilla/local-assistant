@@ -384,6 +384,27 @@ class MapsTool(
     }
 }
 
+/** A link rather than an app, so whichever YouTube client the phone has, or its browser, takes it. */
+class YouTubeTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
+    override val name = "search_youtube"
+
+    override fun describe() = """
+        {"name":"search_youtube",
+         "description":"Search YouTube for videos and show the results.",
+         "parameters":{"type":"object","properties":{
+           "query":{"type":"string"}},
+          "required":["query"]}}
+    """.trimIndent()
+
+    override fun run(arguments: JSONObject): String {
+        val query = arguments.optString("query").ifBlank { return error("missing query") }
+        listener.onToolStarted(name, query)
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(query)}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return start(launcher, intent, "showing YouTube results for $query")
+    }
+}
+
 private fun start(launcher: ActivityLauncher, intent: Intent, done: String, leavesPanel: Boolean = true): String = runCatching {
     launcher.launch(intent, leavesPanel)
     JSONObject().put("status", done).toString()

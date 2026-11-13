@@ -78,6 +78,8 @@ class CommandRouterTest {
         assertEquals("aeropuerto", action(es("ruta al aeropuerto")).arguments["destination"])
         assertEquals("casa de Ana", action(es("navega hasta casa de Ana en coche")).arguments["destination"])
         assertEquals("Heathrow", action(en("Navigate to Heathrow")).arguments["destination"])
+        assertEquals("Santander", action(es("ay, pues llévame a Santander.")).arguments["destination"])
+        assertEquals("Santander", action(es("Abre el mapa y llévame a Santander.")).arguments["destination"])
         assertEquals("la carretera de Ugena y Yeles", action(es("Llévame a la carretera de Ugena y Yeles.")).arguments["destination"])
         assertEquals("transit", action(en("directions to the British Museum by bus")).arguments["mode"])
 
@@ -104,6 +106,10 @@ class CommandRouterTest {
         assertEquals("cámara", action(es("abre la cámara")).arguments["name"])
         assertEquals("Signal", action(en("open the Signal app")).arguments["name"])
         assertEquals("Telegram", action(es("Abre Telegram.")).arguments["name"])
+        val video = action(es("Búscame cómo hacer hula hoop en YouTube"))
+        assertEquals("search_youtube", video.tool)
+        assertEquals("cómo hacer hula hoop", video.arguments["query"])
+        assertEquals("lofi", action(en("play lofi on YouTube")).arguments["query"])
         assertNull(es("Ábreme YouTube y dime qué tengo en el feed principal"))
     }
 
@@ -136,6 +142,7 @@ class CommandRouterTest {
         assertEquals(Command.Lookup("Cuáles son las noticias principales de hoy"), es("¿Cuáles son las noticias principales de hoy?"))
         assertEquals(Command.Lookup("qué tiempo hace en Toledo"), es("Oye, ¿qué tiempo hace en Toledo?"))
         assertEquals(Command.Lookup("What's the weather tomorrow"), en("What's the weather tomorrow?"))
+        assertEquals(Command.Lookup("qué tiempo va a ser mañana"), es("Hola, ¿qué tiempo va a ser mañana?"))
     }
 
     @Test
@@ -152,6 +159,8 @@ class CommandRouterTest {
             "Abre",
             "cuánto es",
             "hola",
+            "Hola, ¿qué tal?",
+            "¿Qué tiempo tarda en cocerse un huevo?",
             "",
             "What is the capital of Iceland?",
             "How does a timer work?",

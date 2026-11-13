@@ -30,6 +30,7 @@ class CommandRouter {
     fun match(utterance: String, spanish: Boolean, now: LocalDateTime = LocalDateTime.now()): Command? {
         val said = Said.of(utterance) ?: return null
         return showOnMap(said, spanish)
+            ?: youtube(said, spanish)
             ?: lookup(said)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
@@ -90,6 +91,16 @@ class CommandRouter {
             "open_maps",
             mapOf("destination" to place, "navigate" to false),
             if (spanish) "Te enseño $place en el mapa." else "Showing $place on the map.",
+        )
+    }
+
+    private fun youtube(said: Said, spanish: Boolean): Command? {
+        val match = YOUTUBE.find(said.folded) ?: return null
+        val query = said.original(match.groups[1]!!.range)
+        return Command.Action(
+            "search_youtube",
+            mapOf("query" to query),
+            if (spanish) "Buscando $query en YouTube." else "Searching YouTube for $query.",
         )
     }
 
@@ -174,7 +185,8 @@ class CommandRouter {
             }
 
             private val LEADING = Regex(
-                """^(?:[\s¿¡"']|(?:oye|hey|ok|okay|vale|venga|por favor|porfa|please|""" +
+                """^(?:[\s¿¡"']|(?:oye|hey|ok|okay|vale|venga|ay|pues|bueno|a ver|eh|mira|anda|entonces|hola|buenas|hello|hi|""" +
+                    """por favor|porfa|please|""" +
                     """(?:me )?puedes|(?:me )?podrias|can you|could you|quiero que|necesito que)[,\s]+)*""",
             )
             private val TRAILING = Regex("""(?:[\s,]+(?:por favor|porfa|please|gracias|thanks|thank you))*[\s?!.]*$""")
@@ -191,7 +203,8 @@ class CommandRouter {
         val ALARM_WORD = Regex("""\b(?:alarma|alarm|despiertame|despiertanos|wake me)\b""")
 
         val NAVIGATE = Regex(
-            """^(?:(?:llevame|llevanos|guiame|navega|navegar|(?:pon(?:me)? |dame )?(?:la |una )?ruta|""" +
+            """^(?:(?:abre|open) (?:el |los |the )?(?:mapas?|maps|google maps)(?: y| and|,)? )?""" +
+                """(?:(?:llevame|llevanos|guiame|navega|navegar|(?:pon(?:me)? |dame )?(?:la |una )?ruta|""" +
                 """como (?:llego|llegar|voy|ir|se va|puedo (?:ir|llegar))|(?:dame )?indicaciones)""" +
                 """ (?:(?:hasta|hacia|para ir a|para llegar a|para|en direccion a|a|al) )+""" +
                 """|(?:navigate|take me|drive(?: me)?|(?:give me |get )?directions|route|how (?:do|can) i get|how to get) """ +
@@ -212,9 +225,15 @@ class CommandRouter {
                 """(?: en internet| en la web| en google| on the web| online)? (.+?)""" +
                 """(?: en internet| en la web| en google| on the web| online)?$""",
         )
+        val YOUTUBE = Regex(
+            """^(?:(?:abre|open) youtube (?:y|and) )?(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|""" +
+                """search(?: for)?|find|look up|play|show me) (?:(?:un |el |a |the )?videos? (?:de |sobre |of |about )?)?(.+?) (?:en|on) youtube$""",
+        )
         val CURRENT_AFFAIRS = Regex(
             """\b(?:noticias|titulares|news|headlines|pronostico|forecast|weather)\b|""" +
-                """\bque tiempo (?:hace|hara|va a hacer)\b|\b(?:va a|will it) (?:llover|rain)\b""",
+                """\bque tiempo (?:hace|hara|va a hacer|va a ser|hay|tendremos|nos espera)\b|""" +
+                """\b(?:el )?tiempo (?:de |para |que hara )?(?:hoy|manana|esta semana|este fin de semana)\b|""" +
+                """\b(?:va a|will it) (?:llover|nevar|rain|snow)\b|\b(?:temperatura|temperature)\b""",
         )
         val MESSAGES = listOf(
             Regex(
