@@ -2,9 +2,12 @@ package dev.localassistant.llm
 
 import android.util.Log
 import dev.localassistant.AssistantRuntime
+import dev.localassistant.commands.Command
+import dev.localassistant.commands.CommandRouter
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.AssistantTool
 import dev.localassistant.tools.ToolRegistry
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -83,6 +86,8 @@ class ChatSession(
     /** The clock line given to the model this turn, so an echo of it never reaches the user. */
     private var clock = ""
 
+    private val commands = CommandRouter()
+
     /** Loading a saved conversation; a question asked meanwhile waits for it. */
     private var loading: Job? = null
 
@@ -114,7 +119,7 @@ class ChatSession(
             _messages.update { it + question + UiMessage(Role.ASSISTANT, "", streaming = true) }
             try {
                 persist(Role.USER, prompt)
-                holder.use { engine -> generateFitting(engine, listener) }
+                if (!answerDirectly(prompt, listener)) holder.use { engine -> generateFitting(engine, listener) }
             } catch (e: NoModelException) {
                 _error.value = ChatError.NoModel
                 dropEmptyReply()
@@ -133,6 +138,72 @@ class ChatSession(
                 synchronized(this@ChatSession) { if (turn == myTurn) _generating.value = false }
             }
         }
+    }
+
+    /**
+     * Handles what needs no model: a recognised command runs its tool and is confirmed in a fixed
+     * sentence, at once and even with no model installed. Returns false when the model should
+     * answer after all, which includes a command whose tool refused, so that the model can ask
+     * which of two contacts was meant or say what went wrong.
+     */
+    private suspend fun answerDirectly(prompt: String, listener: ReplyListener?): Boolean {
+        val spanish = language() == "es"
+        val reply = when (val command = commands.match(prompt, spanish)) {
+            null -> return false
+            is Command.Answer -> command.text
+            is Command.Action -> {
+                val tool = tools?.available()?.firstOrNull { it.name == command.tool } ?: return false
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { JSONObject(tool.run(JSONObject(command.arguments))) }.getOrNull()
+                }
+                Log.i(TAG, "Command ${command.tool} -> ${result.toString().take(120)}")
+                if (result == null || result.has("error")) return false
+                command.confirmation
+            }
+            is Command.Lookup -> {
+                val search = tools?.takeIf { it.webSearchEnabled() }?.available()?.firstOrNull { it.name == WEB_SEARCH }
+                    ?: return say(
+                        if (spanish) "La búsqueda en internet está desactivada. Actívala en Ajustes." else "Web search is turned off. Turn it on in Settings.",
+                        listener,
+                    )
+                val results = withContext(Dispatchers.IO) {
+                    runCatching { JSONObject(search.run(JSONObject().put("query", command.query))) }.getOrNull()
+                }?.optJSONArray("results")?.takeIf { it.length() > 0 }
+                    ?: return say(
+                        if (spanish) "No he podido buscar en internet ahora mismo." else "I could not search the web just now.",
+                        listener,
+                    )
+                // The results go in with the question, so the model only has to read them: it
+                // is spared the decision to search, which is the step small models get wrong.
+                _messages.update { list ->
+                    val asked = list.indexOfLast { it.role == Role.USER }
+                    list.mapIndexed { index, message ->
+                        if (index == asked) message.copy(modelText = withResults(prompt, command.query, results)) else message
+                    }
+                }
+                return false
+            }
+        }
+        return say(reply, listener)
+    }
+
+    private fun say(reply: String, listener: ReplyListener?): Boolean {
+        _messages.update { list -> list.dropLast(1) + list.last().copy(text = reply) }
+        listener?.onChunk(reply)
+        return true
+    }
+
+    private fun withResults(question: String, query: String, results: JSONArray): String = buildString {
+        appendLine(clock)
+        appendLine("Web search results for \"$query\":")
+        appendLine("<<<")
+        for (i in 0 until results.length()) {
+            val result = results.getJSONObject(i)
+            appendLine("${i + 1}. ${result.optString("title")}: ${result.optString("snippet")}")
+        }
+        appendLine(">>>")
+        append("Answer from these results, in one or two sentences: ")
+        append(question)
     }
 
     /** The system message and tools every conversation starts with, for [EngineHolder.preload]. */
@@ -342,5 +413,6 @@ class ChatSession(
     private companion object {
         const val TAG = "ChatSession"
         const val MAX_TOOL_ROUNDS = 4
+        const val WEB_SEARCH = "web_search"
     }
 }
