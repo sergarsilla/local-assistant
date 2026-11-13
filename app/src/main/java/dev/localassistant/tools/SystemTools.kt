@@ -240,6 +240,8 @@ class CalendarTool(
 class SendMessageTool(
     private val queue: ActionQueue,
     private val contacts: ContactsDirectory,
+    private val preferences: AppPreferences,
+    private val installed: InstalledApps,
     private val listener: ToolActivityListener,
 ) : AssistantTool {
     override val name = "send_message"
@@ -263,8 +265,18 @@ class SendMessageTool(
             // Without the permission the messaging app asks who to send it to.
             Recipient.NoPermission -> ""
         }
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(number)}"))
-            .putExtra("sms_body", text)
+        val route = AppRouting.message(preferences.messagingApp.value, installed.whatsAppInstalled(), number)
+        val intent = when (route) {
+            MessageRoute.Sms -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(number)}"))
+                .putExtra("sms_body", text)
+            is MessageRoute.WhatsAppChat ->
+                Intent(Intent.ACTION_VIEW, Uri.parse(AppRouting.whatsAppChatUrl(route.digits, Uri.encode(text))))
+                    .setPackage(WHATSAPP_PACKAGE)
+            MessageRoute.WhatsAppShare -> Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, text)
+                .setPackage(WHATSAPP_PACKAGE)
+        }
         queue.propose(PendingAction(ActionKind.MESSAGE, "$recipient: $text", intent))
         return JSONObject().put("status", "waiting for the user to confirm").toString()
     }
@@ -330,9 +342,10 @@ private const val MAX_CANDIDATES = 5
 
 private fun error(message: String) = JSONObject().put("error", message).toString()
 
-/** Navigation and places go to whichever maps app the phone has, Google's or not. */
+/** Navigation and places go to the maps app the user picked, or to whichever one Android offers. */
 class MapsTool(
-    private val context: Context,
+    private val preferences: AppPreferences,
+    private val installed: InstalledApps,
     private val launcher: ActivityLauncher,
     private val listener: ToolActivityListener,
 ) : AssistantTool {
@@ -361,16 +374,13 @@ class MapsTool(
             "transit" -> "r"
             else -> "d"
         }
-        // google.navigation is understood by Google Maps; geo: works with any maps app.
-        val candidates = buildList {
-            if (navigate) add(Uri.parse("google.navigation:q=$query&mode=$mode"))
-            add(Uri.parse("geo:0,0?q=$query"))
-        }
-        val intent = candidates
-            .map { Intent(Intent.ACTION_VIEW, it).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-            .firstOrNull { it.resolveActivity(context.packageManager) != null }
+        fun intent(route: MapsRoute) =
+            Intent(Intent.ACTION_VIEW, Uri.parse(AppRouting.mapsUri(route.scheme, query, mode)))
+                .setPackage(route.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val route = AppRouting.maps(navigate, preferences.mapsPackage.value) { installed.handles(intent(it)) }
             ?: return JSONObject().put("error", "no maps app installed").toString()
-        return start(launcher, intent, if (navigate) "navigating to $destination" else "showing $destination")
+        return start(launcher, intent(route), if (navigate) "navigating to $destination" else "showing $destination")
     }
 }
 
