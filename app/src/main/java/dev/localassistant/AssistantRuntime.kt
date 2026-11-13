@@ -5,6 +5,7 @@ import dev.localassistant.llm.EngineHolder
 import dev.localassistant.models.ModelImporter
 import dev.localassistant.models.ModelStore
 import dev.localassistant.history.ConversationStore
+import dev.localassistant.tools.AppPreferences
 import dev.localassistant.tools.ToolRegistry
 import dev.localassistant.voice.CaptureRecorder
 import dev.localassistant.voice.SpeechHolder
@@ -31,6 +32,8 @@ object AssistantRuntime {
         private set
     lateinit var voiceSettings: VoiceSettings
         private set
+    lateinit var apps: AppPreferences
+        private set
     lateinit var tools: ToolRegistry
         private set
     lateinit var history: ConversationStore
@@ -51,7 +54,8 @@ object AssistantRuntime {
         speech = SpeechHolder(app, scope)
         ttsVoices = TtsVoices(app, scope)
         voiceSettings = VoiceSettings(app)
-        tools = ToolRegistry(app)
+        apps = AppPreferences(app)
+        tools = ToolRegistry(app, apps)
         history = ConversationStore(app)
         wakeWord = WakeWordSettings(app)
         VoicePacks.init(app)

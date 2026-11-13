@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 data class ToolActivity(val name: String, val summary: String)
 
 /** Everything the model is allowed to do, plus what it is doing right now. */
-class ToolRegistry(private val context: Context) {
+class ToolRegistry(private val context: Context, apps: AppPreferences) {
     val actions = ActionQueue()
 
     /**
@@ -44,14 +44,15 @@ class ToolRegistry(private val context: Context) {
     }
 
     private val contacts = ContactsDirectory(context)
+    private val installed = InstalledApps(context)
 
     private val onDevice = listOf(
         TimerTool(launcher, listener),
         AlarmTool(launcher, listener),
         OpenAppTool(context, launcher, listener),
-        MapsTool(context, launcher, listener),
+        MapsTool(apps, installed, launcher, listener),
         CalendarTool(actions, listener),
-        SendMessageTool(actions, contacts, listener),
+        SendMessageTool(actions, contacts, apps, installed, listener),
         CallTool(launcher, contacts, listener),
     )
     private val online = listOf(WebSearchTool(listener), ReadPageTool(listener))
