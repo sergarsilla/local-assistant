@@ -32,6 +32,16 @@ object Catalog {
             RemoteModelFile("Qwen/Qwen3-1.7B-GGUF", "Qwen3-1.7B-Q8_0.gguf", 1_834_426_016),
         ),
         CatalogEntry(
+            "Qwen3.5 2B",
+            R.string.catalog_note_qwen35_2b,
+            RemoteModelFile("unsloth/Qwen3.5-2B-GGUF", "Qwen3.5-2B-Q4_K_M.gguf", 1_280_835_840),
+        ),
+        CatalogEntry(
+            "Qwen3.5 4B",
+            R.string.catalog_note_qwen35_4b,
+            RemoteModelFile("unsloth/Qwen3.5-4B-GGUF", "Qwen3.5-4B-Q4_K_M.gguf", 2_740_937_888),
+        ),
+        CatalogEntry(
             "Gemma 4 E2B",
             R.string.catalog_note_gemma_e2b_litert,
             RemoteModelFile("litert-community/gemma-4-E2B-it-litert-lm", "gemma-4-E2B-it.litertlm", 2_588_147_712),
