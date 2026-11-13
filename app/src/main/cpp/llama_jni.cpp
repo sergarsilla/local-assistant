@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -280,6 +281,14 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     samplingParams.temp = temperature;
     common_sampler *sampler = common_sampler_init(session->model, samplingParams);
 
+    // Special tokens are left out of the text, except the ones a tool call is written with:
+    // without them the parser sees an ordinary sentence and the call is shown, not run.
+    std::set<llama_token> keptSpecial;
+    for (const std::string &text : chatParams.preserved_tokens) {
+        const std::vector<llama_token> ids = common_tokenize(vocab, text, /*add_special=*/false, /*parse_special=*/true);
+        if (ids.size() == 1) keptSpecial.insert(ids[0]);
+    }
+
     const auto generateStart = Clock::now();
     std::string raw;
     std::string streamed;
@@ -293,7 +302,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
         if (llama_vocab_is_eog(vocab, token)) break;
         ++generated;
 
-        raw += common_token_to_piece(ctx, token, /*special=*/false);
+        raw += common_token_to_piece(ctx, token, /*special=*/keptSpecial.count(token) > 0);
         // Parsing as we go keeps tool-call syntax out of what the user sees, but running the
         // grammar over the whole reply on every token would cost more than generating it.
         std::string content = streamed;
