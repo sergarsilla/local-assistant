@@ -40,7 +40,16 @@ class CommandRouter {
             ?: openApp(said, spanish)
             ?: clock(said, spanish, now)
             ?: sum(said, spanish)
+            ?: recent(said)
     }
+
+    /**
+     * A question about how things stand now. A model answers these from memory, fluently and
+     * wrongly - every one tested named a winner for "the latest Grand Prix" - so they are
+     * searched for. Last in the chain: the time and the date are answered before getting here.
+     */
+    private fun recent(said: Said): Command? =
+        if (RECENT_QUESTION.containsMatchIn(said.folded)) Command.Lookup(said.text) else null
 
     private fun timer(said: Said, spanish: Boolean): Command? {
         val reminder = REMIND_IN.containsMatchIn(said.digits)
@@ -224,6 +233,12 @@ class CommandRouter {
             """^(?:busca(?:me)?|buscar|googlea|search(?: the web)?(?: for)?|look up|google)""" +
                 """(?: en internet| en la web| en google| on the web| online)? (.+?)""" +
                 """(?: en internet| en la web| en google| on the web| online)?$""",
+        )
+        val RECENT_QUESTION = Regex(
+            """^(?:quien|que|cual|cuales|cuanto|cuanta|cuantos|cuantas|como (?:va|van|quedo|quedaron|esta|estan)|donde|""" +
+                """who|what|which|how much|how many|where)\b.*""" +
+                """\b(?:ultim[oa]s?|actual|actuales|actualmente|ahora mismo|hoy|esta semana|este ano|este mes|reciente|""" +
+                """recientes|recientemente|latest|last|current|currently|today|right now|this week|this year|this month)\b""",
         )
         val YOUTUBE = Regex(
             """^(?:(?:abre|open) youtube (?:y|and) )?(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|""" +

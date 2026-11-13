@@ -4,6 +4,7 @@ import android.util.Log
 import dev.localassistant.AssistantRuntime
 import dev.localassistant.commands.Command
 import dev.localassistant.commands.CommandRouter
+import dev.localassistant.commands.SpokenText
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.AssistantTool
 import dev.localassistant.tools.ToolRegistry
@@ -193,7 +194,12 @@ class ChatSession(
         return true
     }
 
+    private fun clockLine() = "[" + SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()) +
+        " " + TimeZone.getDefault().id + "]"
+
     private fun withResults(question: String, query: String, results: JSONArray): String = buildString {
+        // What a search brings back is only "recent" against today's date.
+        clock = clockLine()
         appendLine(clock)
         appendLine("Web search results for \"$query\":")
         appendLine("<<<")
@@ -327,7 +333,9 @@ class ChatSession(
      * they were handed, so that echo is dropped, and hidden while it is still arriving.
      */
     private fun showReply(reply: String): String {
-        val soFar = reply.trimStart()
+        // Some models think aloud without opening the block they then close, which the parser
+        // cannot tell from an answer; what follows the last closing tag is the answer.
+        val soFar = reply.substringAfterLast(THINK_END).trimStart()
         val text = when {
             soFar.startsWith(clock) -> soFar.removePrefix(clock).trimStart()
             clock.startsWith(soFar) -> ""
@@ -347,9 +355,10 @@ class ChatSession(
      */
     private fun decorate(question: String, screen: ScreenAttachment?): String = buildString {
         val screenText = screen?.text
-        clock = "[" + SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()) +
-            " " + TimeZone.getDefault().id + "]"
-        appendLine(clock)
+        // Handed the clock with every question, models work it into answers that have nothing
+        // to do with it: a greeting came back with the full date and time read out.
+        clock = if (TIME_WORDS.containsMatchIn(SpokenText.fold(question))) clockLine() else ""
+        if (clock.isNotEmpty()) appendLine(clock)
         if (screenText.isNullOrBlank() && screen?.image != null) {
             appendLine("(A screenshot of the user's screen is attached.)")
         }
@@ -397,8 +406,8 @@ class ChatSession(
                 append("user could do it themselves, and afterwards confirm in a few words what happened. ")
                 append("If a tool reports an error, say plainly what failed; never claim something was done when it was not. ")
 
-                append("Each question begins with the current date and time in brackets; use it when the answer ")
-                append("depends on the date or the time, and never repeat it back. ")
+                append("A question that depends on the date or the time begins with them in brackets; use them ")
+                append("for the answer and never repeat them back. ")
 
                 if (canSearch) {
                     append("Use web_search only for facts that change and that you cannot already know, such as news, ")
@@ -414,5 +423,12 @@ class ChatSession(
         const val TAG = "ChatSession"
         const val MAX_TOOL_ROUNDS = 4
         const val WEB_SEARCH = "web_search"
+        const val THINK_END = "</think>"
+        val TIME_WORDS = Regex(
+            """\b(?:hoy|manana|ayer|anoche|ahora|hora|horas|dia|dias|fecha|semana|mes|ano|cuando|tarde|noche|""" +
+                """lunes|martes|miercoles|jueves|viernes|sabado|domingo|evento|cita|reunion|calendario|recuerdame|""" +
+                """today|tomorrow|yesterday|tonight|now|time|date|day|days|week|month|year|when|morning|evening|""" +
+                """monday|tuesday|wednesday|thursday|friday|saturday|sunday|event|meeting|calendar|remind)\b""",
+        )
     }
 }

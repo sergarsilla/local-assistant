@@ -143,6 +143,9 @@ class CommandRouterTest {
         assertEquals(Command.Lookup("qué tiempo hace en Toledo"), es("Oye, ¿qué tiempo hace en Toledo?"))
         assertEquals(Command.Lookup("What's the weather tomorrow"), en("What's the weather tomorrow?"))
         assertEquals(Command.Lookup("qué tiempo va a ser mañana"), es("Hola, ¿qué tiempo va a ser mañana?"))
+        assertEquals(Command.Lookup("Quién ganó el último Gran Premio de Fórmula 1"), es("¿Quién ganó el último Gran Premio de Fórmula 1?"))
+        assertEquals(Command.Lookup("Who is the current president of France"), en("Who is the current president of France?"))
+        assertEquals("Hoy es viernes, 13 de noviembre de 2026.", answer(es("¿Qué día es hoy?")))
     }
 
     @Test
