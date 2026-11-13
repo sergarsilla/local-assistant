@@ -37,7 +37,8 @@ struct Session {
     std::vector<llama_token> cached;
     // Where the processed preface is kept between loads; empty when it is not kept.
     std::string statePath;
-    bool stateTried = false;
+    // Set once the file turned out to be absent or unusable, so it is not read again in vain.
+    bool stateMissing = false;
 };
 
 using Clock = std::chrono::steady_clock;
@@ -72,6 +73,30 @@ bool decodeTokens(llama_context *ctx, const std::vector<llama_token> &tokens, si
         llama_batch batch = llama_batch_get_one(const_cast<llama_token *>(tokens.data() + i), n);
         if (llama_decode(ctx, batch) != 0) return false;
     }
+    return true;
+}
+
+size_t commonPrefix(const std::vector<llama_token> &a, const std::vector<llama_token> &b) {
+    size_t n = 0;
+    while (n < a.size() && n < b.size() && a[n] == b[n]) ++n;
+    return n;
+}
+
+/** Puts the saved preface into an empty context. On failure the context is left empty. */
+bool restorePreface(Session *session) {
+    if (session->statePath.empty() || session->stateMissing) return false;
+    llama_context *ctx = session->ctx;
+    std::vector<llama_token> saved(llama_n_ctx(ctx));
+    size_t count = 0;
+    const auto start = Clock::now();
+    if (!llama_state_load_file(ctx, session->statePath.c_str(), saved.data(), saved.size(), &count)) {
+        session->stateMissing = true;
+        llama_memory_clear(llama_get_memory(ctx), true);
+        return false;
+    }
+    saved.resize(count);
+    session->cached = std::move(saved);
+    LOGI("Restored %zu saved tokens in %lldms", count, elapsedMs(start));
     return true;
 }
 
@@ -190,46 +215,65 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     std::vector<llama_token> tokens = common_tokenize(ctx, prompt, /*add_special=*/true, /*parse_special=*/true);
     if (tokens.size() + static_cast<size_t>(maxTokens) > llama_n_ctx(ctx)) return kContextOverflow;
 
-    // The instructions and tool definitions are the same on every load and take many seconds to
-    // work through, so a fresh context first takes back what an earlier load saved. Whatever no
-    // longer matches the prompt is dropped by the prefix comparison below, like any stale turn.
-    if (session->cached.empty() && !session->stateTried && !session->statePath.empty()) {
-        session->stateTried = true;
-        std::vector<llama_token> saved(llama_n_ctx(ctx));
-        size_t count = 0;
-        const auto restoreStart = Clock::now();
-        if (llama_state_load_file(ctx, session->statePath.c_str(), saved.data(), saved.size(), &count)) {
-            saved.resize(count);
-            session->cached = std::move(saved);
-            LOGI("Restored %zu saved tokens in %lldms", count, elapsedMs(restoreStart));
-        } else {
-            llama_memory_clear(llama_get_memory(ctx), true);
-        }
+    // Preparing generates nothing, so only what every conversation starts with is worked out
+    // and kept: the prompt is cut where a different first question would start to differ.
+    const bool preparing = maxTokens == 0;
+    if (preparing && !inputs.messages.empty()) {
+        common_chat_templates_inputs other = inputs;
+        other.messages.back().content = "#";
+        const common_chat_params otherParams = common_chat_templates_apply(session->templates.get(), other);
+        const std::vector<llama_token> otherTokens = common_tokenize(
+            ctx, otherParams.prompt + otherParams.generation_prompt, /*add_special=*/true, /*parse_special=*/true);
+        tokens.resize(commonPrefix(tokens, otherTokens));
+        if (tokens.empty()) return kOk;
     }
 
-    size_t reused = 0;
-    while (reused < tokens.size() && reused < session->cached.size() && tokens[reused] == session->cached[reused]) {
-        ++reused;
+    llama_memory_t memory = llama_get_memory(ctx);
+    // A fresh context first takes back the preface an earlier load saved: it is the same on
+    // every load and takes many seconds to work through.
+    if (session->cached.empty()) restorePreface(session);
+
+    // Generating needs fresh logits, so at least the last prompt token is decoded again.
+    const size_t reusable = preparing ? tokens.size() : tokens.size() - 1;
+    size_t reused = std::min(commonPrefix(tokens, session->cached), reusable);
+    if (reused < session->cached.size() && !llama_memory_seq_rm(memory, 0, static_cast<llama_pos>(reused), -1)) {
+        // Models with recurrent layers cannot forget only the end of what they hold. Carrying
+        // on regardless left the previous question in place and answered that one, so they go
+        // back to the saved preface instead, or to nothing when it does not fit this prompt.
+        llama_memory_clear(memory, true);
+        session->cached.clear();
+        reused = 0;
+        if (restorePreface(session)) {
+            if (commonPrefix(tokens, session->cached) == session->cached.size() && session->cached.size() <= reusable) {
+                reused = session->cached.size();
+            } else {
+                llama_memory_clear(memory, true);
+                session->cached.clear();
+            }
+        }
+        LOGI("Could not trim the context; restarted from %zu saved tokens", reused);
     }
-    // At least the last prompt token must be decoded to get fresh logits.
-    reused = std::min(reused, tokens.size() - 1);
-    llama_memory_seq_rm(llama_get_memory(ctx), 0, static_cast<llama_pos>(reused), -1);
     session->cached.assign(tokens.begin(), tokens.begin() + static_cast<long>(reused));
 
     const auto prefillStart = Clock::now();
     if (!decodeTokens(ctx, tokens, reused)) {
         session->cached.clear();
-        llama_memory_clear(llama_get_memory(ctx), true);
+        llama_memory_clear(memory, true);
         return kDecodeFailed;
     }
     session->cached = tokens;
     const long long prefillMs = elapsedMs(prefillStart);
-    // A call that generates nothing is the preface being prepared: the one state worth keeping,
-    // and only when enough of it had to be worked out to make the next load quicker.
-    if (maxTokens == 0 && !session->statePath.empty() && tokens.size() - reused > kMinTokensWorthSaving) {
+    // Saved only when enough of it had to be worked out to make the next load quicker.
+    if (preparing && !session->statePath.empty() && tokens.size() - reused > kMinTokensWorthSaving) {
         const auto saveStart = Clock::now();
         const bool saved = llama_state_save_file(ctx, session->statePath.c_str(), tokens.data(), tokens.size());
+        session->stateMissing = !saved;
         LOGI("Saved %zu tokens for the next load in %lldms (%s)", tokens.size(), elapsedMs(saveStart), saved ? "ok" : "failed");
+    }
+    if (preparing) {
+        jlong values[5] = {static_cast<jlong>(tokens.size()), static_cast<jlong>(reused), prefillMs, 0, 0};
+        env->SetLongArrayRegion(stats, 0, 5, values);
+        return kOk;
     }
 
     common_params_sampling samplingParams;
