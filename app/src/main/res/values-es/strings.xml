@@ -162,8 +162,8 @@
     <string name="models_network_open_settings">Abrir permisos de la app</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
-    <string name="catalog_note_qwen3_1_7b">Por defecto. El que de verdad actúa en el móvil: temporizadores, mapas, mensajes.</string>
-    <string name="catalog_note_gemma_e2b_litert">El más rápido, y el único que lee imágenes. A menudo dice que actúa sin hacerlo.</string>
+    <string name="catalog_note_qwen3_1_7b">Más ligero y arranca algo antes. Conversa bastante peor.</string>
+    <string name="catalog_note_gemma_e2b_litert">Por defecto. La mejor conversación de los modelos lo bastante rápidos para hablarles, y el único que lee imágenes.</string>
     <string name="catalog_note_gemma_e4b_litert">Más listo y más lento. Necesita más memoria.</string>
     <string name="catalog_note_gemma_e2b_gguf">El mismo modelo en GGUF, para comparar con llama.cpp.</string>
     <string name="catalog_note_qwen3_4b">Razona bien, pero un modelo de 4B va lento en un móvil: unos 2 tokens por segundo aquí.</string>
@@ -280,5 +280,5 @@
     <string name="settings_network_off">Bloqueada. Todo funciona salvo las descargas y la búsqueda en internet.</string>
     <string name="settings_permissions_manage">Gestionar en los ajustes del sistema</string>
     <string name="settings_permissions_manage_note">Quita un permiso, o concede uno que denegaste antes.</string>
-    <string name="catalog_note_lfm25_2_6b">Las respuestas mejor escritas de los medidos aquí, pero piensa antes de contestar: de 10 a 60 segundos. No actúa en el móvil.</string>
+    <string name="catalog_note_qwen35_4b">Las respuestas más finas de las medidas aquí, a un tercio de la velocidad: unos 5 tokens por segundo y más de un minuto en cargar la primera vez.</string>
 </resources>

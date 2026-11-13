@@ -162,8 +162,8 @@
     <string name="models_network_open_settings">Open app permissions</string>
     <string name="models_format_gguf">GGUF · llama.cpp</string>
     <string name="models_format_litert">LiteRT-LM</string>
-    <string name="catalog_note_qwen3_1_7b">Default. The one that reliably acts on the phone: timers, maps, messages.</string>
-    <string name="catalog_note_gemma_e2b_litert">The fastest, and the only one that reads images. Often says it is acting without acting.</string>
+    <string name="catalog_note_qwen3_1_7b">Lighter and a little quicker to start. Noticeably worse at conversation.</string>
+    <string name="catalog_note_gemma_e2b_litert">Default. The best conversation of the models quick enough to talk to, and the only one that reads images.</string>
     <string name="catalog_note_gemma_e4b_litert">Smarter and slower. Needs more memory.</string>
     <string name="catalog_note_gemma_e2b_gguf">The same model as GGUF, to compare with llama.cpp.</string>
     <string name="catalog_note_qwen3_4b">Reasons well, but a 4B model is slow on a phone: about 2 tokens a second here.</string>
@@ -280,5 +280,5 @@
     <string name="settings_network_off">Blocked. Everything works except downloads and web search.</string>
     <string name="settings_permissions_manage">Manage in system settings</string>
     <string name="settings_permissions_manage_note">Revoke a permission, or allow one you denied before.</string>
-    <string name="catalog_note_lfm25_2_6b">The best-written answers of those measured here, but it thinks before replying: 10 to 60 seconds. It does not act on the phone.</string>
+    <string name="catalog_note_qwen35_4b">The sharpest answers measured here, at a third of the speed: about 5 tokens a second, and over a minute to load the first time.</string>
 </resources>

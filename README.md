@@ -104,14 +104,22 @@ That ceiling is also the honest limit on how clever the assistant is. Models thi
 arithmetic wrong, lose the thread of a long conversation, and sometimes answer in the wrong
 language. The app can make them quick and private; it cannot make them larger.
 
-Whether a model acts rather than only talks is a property of the model, not of the format. Asking
-the same question ten times, Qwen3 1.7B called the right tool ten times out of ten, while Gemma 4
-E2B managed two and otherwise answered that it was opening maps without opening anything — the
-worst way to fail, because nothing looks wrong. Qwen3 1.7B is what first-run setup downloads for
-that reason, even though Gemma is almost twice as fast and the only one here that reads images.
+Which model to run was settled by asking each the same thirteen questions on a Pixel 10, taken
+from real conversations. The everyday commands never reach a model, so what was compared is
+conversation, and whether a model reaches for a tool when asked in a roundabout way:
 
-Uncensoring a model appears to cost it that ability: the abliterated Qwen3 1.7B writes
-`Open_maps destination=...` as plain prose where the base model emits a real call.
+| Model | Speed | What it did |
+|---|---|---|
+| Gemma 4 E2B (LiteRT) | 16-20 tok/s | Best answers of the quick ones, opens the app asked for. The default. |
+| Qwen3.5 4B | 5 tok/s | The sharpest answers, too slow to talk to. |
+| Qwen3 1.7B | 13 tok/s | Quick, weak: wrong capitals, replies in the wrong language. |
+| LFM3 1.7B, LFM2.5 2.6B | 9-16 tok/s | Reason before every answer, aloud or for up to a minute. |
+| Qwen3.5 2B | 12-16 tok/s | Calls tools nobody asked for. |
+
+Every one of them named a winner for "the latest Grand Prix" from memory, and all were wrong, so
+questions about how things stand now are searched for rather than answered. Handing a model the
+date with every question made it worse at everything else - a greeting came back with the time
+read out in full - so it only gets the date when the question is about time.
 
 Known gaps: speaking over the assistant to interrupt it needs echo cancellation that is not
 written yet, so interrupting is a tap; the Tensor NPU needs a dispatch library built separately;
