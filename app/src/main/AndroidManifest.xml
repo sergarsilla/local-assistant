@@ -28,6 +28,12 @@
             <action android:name="android.intent.action.DIAL" />
             <data android:scheme="tel" />
         </intent>
+        <!-- Lists the maps apps to choose from; matching here also lets one be targeted by package. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <package android:name="com.whatsapp" />
     </queries>
 
     <application
