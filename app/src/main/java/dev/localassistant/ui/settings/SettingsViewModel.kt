@@ -13,6 +13,9 @@ import dev.localassistant.models.Storage
 import dev.localassistant.models.TransferState
 import dev.localassistant.models.Transfers
 import dev.localassistant.system.SystemStatus
+import dev.localassistant.tools.AppChoice
+import dev.localassistant.tools.InstalledApps
+import dev.localassistant.tools.MessagingApp
 import dev.localassistant.voice.PackKind
 import dev.localassistant.voice.VoicePack
 import dev.localassistant.voice.VoicePacks
@@ -44,6 +47,16 @@ data class SettingsUiState(
     /** "" follows the system; otherwise "es" or "en". */
     val appLanguage: String = "",
     val pendingPackDelete: VoicePack? = null,
+    val apps: AppsUi = AppsUi(),
+)
+
+/** The apps the assistant hands maps and messages to, and what there is to choose from. */
+data class AppsUi(
+    val mapsChoices: List<AppChoice> = emptyList(),
+    /** Null leaves it to Android. */
+    val mapsPackage: String? = null,
+    val messaging: MessagingApp = MessagingApp.SMS,
+    val whatsAppInstalled: Boolean = false,
 )
 
 sealed interface SettingsEvent {
@@ -55,6 +68,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val system = MutableStateFlow(SystemStatus.read(application))
     private val appLanguage = MutableStateFlow(readAppLanguage())
     private val pendingPackDelete = MutableStateFlow<VoicePack?>(null)
+    private val installedApps = InstalledApps(application)
+    private val mapsChoices = MutableStateFlow(installedApps.mapsApps())
+    private val whatsAppInstalled = MutableStateFlow(installedApps.whatsAppInstalled())
+
+    private val appsState = combine(
+        mapsChoices,
+        runtime.apps.mapsPackage,
+        runtime.apps.messagingApp,
+        whatsAppInstalled,
+    ) { choices, maps, messaging, whatsApp ->
+        // A maps app that was uninstalled since it was picked shows as nothing picked.
+        AppsUi(choices, maps?.takeIf { chosen -> choices.any { it.packageName == chosen } }, messaging, whatsApp)
+    }
     private val events = Channel<SettingsEvent>(Channel.BUFFERED)
     val messages: Flow<SettingsEvent> = events.receiveAsFlow()
 
@@ -82,8 +108,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         },
         runtime.wakeWord.state,
         appLanguage,
-    ) { voice, (status, engine, webSearch, saveHistory), wake, language ->
+        appsState,
+    ) { voice, (status, engine, webSearch, saveHistory), wake, language, apps ->
         voice.copy(
+            apps = apps,
             status = status,
             engine = engine,
             webSearch = webSearch,
@@ -96,7 +124,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun refresh() {
         system.value = SystemStatus.read(getApplication())
         appLanguage.value = readAppLanguage()
+        mapsChoices.value = installedApps.mapsApps()
+        whatsAppInstalled.value = installedApps.whatsAppInstalled()
     }
+
+    fun setMapsApp(packageName: String?) = runtime.apps.setMapsPackage(packageName)
+
+    fun setMessagingApp(app: MessagingApp) = runtime.apps.setMessagingApp(app)
 
     fun setListenOnOpen(value: Boolean) = runtime.voiceSettings.update { it.copy(listenOnOpen = value) }
 

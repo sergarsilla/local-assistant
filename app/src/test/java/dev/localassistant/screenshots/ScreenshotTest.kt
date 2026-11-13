@@ -39,6 +39,8 @@ import dev.localassistant.ui.panel.PanelUiState
 import dev.localassistant.ui.panel.Suggestion
 import dev.localassistant.ui.settings.SettingsActions
 import dev.localassistant.ui.settings.SettingsScreen
+import dev.localassistant.tools.AppChoice
+import dev.localassistant.ui.settings.AppsUi
 import dev.localassistant.ui.settings.PackUi
 import dev.localassistant.ui.settings.SettingsUiState
 import dev.localassistant.voice.VoicePack
@@ -249,6 +251,27 @@ class ScreenshotTest {
                     PackUi(VoicePack.TTS_ES_MIRO, installed = true, inUse = true, transfer = null),
                     PackUi(VoicePack.TTS_ES_SHARVARD, installed = false, inUse = false, transfer = TransferState.Running("tts-es-sharvard", 40_000_000, 95_000_000)),
                     PackUi(VoicePack.TTS_KOKORO_ES, installed = false, inUse = false, transfer = null),
+                ),
+                apps = AppsUi(
+                    mapsChoices = listOf(AppChoice("org.example.maps", "Organic Maps"), AppChoice("org.example.osm", "OsmAnd")),
+                    mapsPackage = "org.example.maps",
+                    whatsAppInstalled = true,
+                ),
+            ),
+            noop<SettingsActions>(),
+        )
+    }
+
+    /** The cards below the fold, which a phone-sized capture of Settings never reaches. */
+    @Config(qualifiers = "+h3000dp")
+    @Test fun settingsLower() = captureScreen("settings_lower") {
+        SettingsScreen(
+            SettingsUiState(
+                status = SystemStatus(isAssistant = true, micGranted = true, contactsGranted = false, notificationsGranted = true),
+                apps = AppsUi(
+                    mapsChoices = listOf(AppChoice("org.example.maps", "Organic Maps"), AppChoice("org.example.osm", "OsmAnd")),
+                    mapsPackage = "org.example.maps",
+                    whatsAppInstalled = true,
                 ),
             ),
             noop<SettingsActions>(),

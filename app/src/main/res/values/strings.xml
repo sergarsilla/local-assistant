@@ -263,4 +263,21 @@
         <item quantity="one">%d message</item>
         <item quantity="other">%d messages</item>
     </plurals>
+    <string name="settings_apps">Apps</string>
+    <string name="settings_apps_maps">Maps and navigation</string>
+    <string name="settings_apps_system">Let Android decide</string>
+    <string name="settings_apps_system_note">Uses your default maps app, or asks which one.</string>
+    <string name="settings_apps_messages">Messages</string>
+    <string name="settings_apps_sms">SMS app</string>
+    <string name="settings_apps_whatsapp">WhatsApp</string>
+    <string name="settings_apps_whatsapp_note">Opens the chat when the number has a country code; otherwise WhatsApp asks who it is for.</string>
+    <string name="settings_permissions">Permissions</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_on">Allowed: shows download progress and the wake word notice.</string>
+    <string name="settings_notifications_off">Optional. Shows download progress and when the wake word is listening.</string>
+    <string name="settings_network">Network</string>
+    <string name="settings_network_on">Allowed: used for downloads and for web search if you turn it on.</string>
+    <string name="settings_network_off">Blocked. Everything works except downloads and web search.</string>
+    <string name="settings_permissions_manage">Manage in system settings</string>
+    <string name="settings_permissions_manage_note">Revoke a permission, or allow one you denied before.</string>
 </resources>

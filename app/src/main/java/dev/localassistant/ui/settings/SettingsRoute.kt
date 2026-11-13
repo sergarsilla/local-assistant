@@ -1,6 +1,9 @@
 package dev.localassistant.ui.settings
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.text.format.Formatter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.localassistant.R
 import dev.localassistant.llm.Accelerator
 import dev.localassistant.system.SystemStatus
+import dev.localassistant.tools.MessagingApp
 import dev.localassistant.ui.components.OnResume
 import dev.localassistant.ui.components.rememberPermissionRequest
 import dev.localassistant.ui.components.rememberWithNotifications
@@ -29,6 +33,7 @@ fun SettingsRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val askMic = rememberPermissionRequest(Manifest.permission.RECORD_AUDIO, viewModel::refresh)
     val askContacts = rememberPermissionRequest(Manifest.permission.READ_CONTACTS, viewModel::refresh)
+    val askNotifications = rememberPermissionRequest(Manifest.permission.POST_NOTIFICATIONS, viewModel::refresh)
     val withNotifications = rememberWithNotifications()
 
     OnResume(viewModel::refresh)
@@ -49,6 +54,12 @@ fun SettingsRoute(
             override fun openKeyboardSettings() = context.startActivity(SystemStatus.keyboardSettings)
             override fun requestMicrophone() = askMic()
             override fun requestContacts() = askContacts()
+            override fun requestNotifications() = askNotifications()
+            override fun openAppSettings() = context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+            )
+            override fun setMapsApp(packageName: String?) = viewModel.setMapsApp(packageName)
+            override fun setMessagingApp(app: MessagingApp) = viewModel.setMessagingApp(app)
             override fun setListenOnOpen(value: Boolean) = viewModel.setListenOnOpen(value)
             override fun setSpeakReplies(value: Boolean) = viewModel.setSpeakReplies(value)
             override fun setKeyboardListens(value: Boolean) = viewModel.setKeyboardListens(value)

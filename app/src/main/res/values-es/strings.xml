@@ -263,4 +263,21 @@
         <item quantity="one">%d mensaje</item>
         <item quantity="other">%d mensajes</item>
     </plurals>
+    <string name="settings_apps">Apps</string>
+    <string name="settings_apps_maps">Mapas y navegación</string>
+    <string name="settings_apps_system">Que decida Android</string>
+    <string name="settings_apps_system_note">Usa tu app de mapas por defecto, o pregunta cuál.</string>
+    <string name="settings_apps_messages">Mensajes</string>
+    <string name="settings_apps_sms">App de SMS</string>
+    <string name="settings_apps_whatsapp">WhatsApp</string>
+    <string name="settings_apps_whatsapp_note">Abre el chat si el número lleva prefijo de país; si no, WhatsApp pregunta para quién es.</string>
+    <string name="settings_permissions">Permisos</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_on">Permitidas: muestran las descargas y el aviso de la palabra de activación.</string>
+    <string name="settings_notifications_off">Opcional. Muestran las descargas y cuándo escucha la palabra de activación.</string>
+    <string name="settings_network">Red</string>
+    <string name="settings_network_on">Permitida: se usa para descargas y para buscar en internet si lo activas.</string>
+    <string name="settings_network_off">Bloqueada. Todo funciona salvo las descargas y la búsqueda en internet.</string>
+    <string name="settings_permissions_manage">Gestionar en los ajustes del sistema</string>
+    <string name="settings_permissions_manage_note">Quita un permiso, o concede uno que denegaste antes.</string>
 </resources>

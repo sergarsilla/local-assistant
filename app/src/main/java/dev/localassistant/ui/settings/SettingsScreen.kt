@@ -11,7 +11,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,12 +26,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import dev.localassistant.BuildConfig
 import dev.localassistant.R
 import dev.localassistant.llm.Accelerator
 import dev.localassistant.models.TransferState
+import dev.localassistant.tools.MessagingApp
 import dev.localassistant.ui.components.ActionRow
 import dev.localassistant.ui.components.CardNote
 import dev.localassistant.ui.components.CardSubheader
@@ -51,6 +55,10 @@ interface SettingsActions {
     fun openKeyboardSettings()
     fun requestMicrophone()
     fun requestContacts()
+    fun requestNotifications()
+    fun openAppSettings()
+    fun setMapsApp(packageName: String?)
+    fun setMessagingApp(app: MessagingApp)
     fun setListenOnOpen(value: Boolean)
     fun setSpeakReplies(value: Boolean)
     fun setKeyboardListens(value: Boolean)
@@ -88,8 +96,10 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
         item { VoiceCard(state, actions) }
         item { DictationCard(state, actions) }
         item { WakeWordCard(state, actions) }
+        item { AppsCard(state.apps, actions) }
         item { ModelCard(state, actions) }
         item { PrivacyCard(state, actions) }
+        item { PermissionsCard(state, actions) }
         item { LanguageCard(state, actions) }
         item { AboutCard() }
     }
@@ -142,13 +152,6 @@ private fun AssistantCard(state: SettingsUiState, actions: SettingsActions) {
 @Composable
 private fun VoiceCard(state: SettingsUiState, actions: SettingsActions) {
     GroupCard(stringResource(R.string.voice_title), icon = AssistantIcons.Mic) {
-        ActionRow(
-            title = stringResource(R.string.settings_microphone),
-            summary = stringResource(if (state.status.micGranted) R.string.voice_mic_granted else R.string.settings_microphone_off),
-            icon = AssistantIcons.Mic,
-            actionLabel = if (state.status.micGranted) null else stringResource(R.string.step_allow),
-            onClick = if (state.status.micGranted) null else actions::requestMicrophone,
-        )
         SwitchRow(
             title = stringResource(R.string.voice_speak_replies),
             checked = state.voice?.speakReplies == true,
@@ -251,14 +254,100 @@ private fun PrivacyCard(state: SettingsUiState, actions: SettingsActions) {
             onCheckedChange = actions::setSaveHistory,
             icon = AssistantIcons.History,
         )
-        ActionRow(
+    }
+}
+
+/** Where "take me to" and "text" end up, so neither is decided by whichever app claims the link first. */
+@Composable
+private fun AppsCard(apps: AppsUi, actions: SettingsActions) {
+    GroupCard(stringResource(R.string.settings_apps), icon = Icons.Filled.Place) {
+        CardSubheader(stringResource(R.string.settings_apps_maps))
+        RadioRow(
+            label = stringResource(R.string.settings_apps_system),
+            selected = apps.mapsPackage == null,
+            onClick = { actions.setMapsApp(null) },
+            summary = stringResource(R.string.settings_apps_system_note),
+        )
+        apps.mapsChoices.forEach { choice ->
+            RadioRow(
+                label = choice.label,
+                selected = apps.mapsPackage == choice.packageName,
+                onClick = { actions.setMapsApp(choice.packageName) },
+            )
+        }
+        CardSubheader(stringResource(R.string.settings_apps_messages))
+        RadioRow(
+            label = stringResource(R.string.settings_apps_sms),
+            selected = apps.messaging == MessagingApp.SMS || !apps.whatsAppInstalled,
+            onClick = { actions.setMessagingApp(MessagingApp.SMS) },
+        )
+        if (apps.whatsAppInstalled) {
+            RadioRow(
+                label = stringResource(R.string.settings_apps_whatsapp),
+                selected = apps.messaging == MessagingApp.WHATSAPP,
+                onClick = { actions.setMessagingApp(MessagingApp.WHATSAPP) },
+                summary = stringResource(R.string.settings_apps_whatsapp_note),
+            )
+        }
+    }
+}
+
+/** Everything Android lets this app do, in one place, with what each permission is for. */
+@Composable
+private fun PermissionsCard(state: SettingsUiState, actions: SettingsActions) {
+    val status = state.status
+    GroupCard(stringResource(R.string.settings_permissions), icon = Icons.Filled.Lock) {
+        PermissionRow(
+            title = stringResource(R.string.settings_microphone),
+            summary = stringResource(if (status.micGranted) R.string.voice_mic_granted else R.string.settings_microphone_off),
+            icon = AssistantIcons.Mic,
+            granted = status.micGranted,
+            request = actions::requestMicrophone,
+        )
+        PermissionRow(
             title = stringResource(R.string.settings_contacts),
-            summary = stringResource(if (state.status.contactsGranted) R.string.settings_contacts_on else R.string.settings_contacts_off),
+            summary = stringResource(if (status.contactsGranted) R.string.settings_contacts_on else R.string.settings_contacts_off),
             icon = Icons.Filled.Person,
-            actionLabel = if (state.status.contactsGranted) null else stringResource(R.string.step_allow),
-            onClick = if (state.status.contactsGranted) null else actions::requestContacts,
+            granted = status.contactsGranted,
+            request = actions::requestContacts,
+        )
+        PermissionRow(
+            title = stringResource(R.string.settings_notifications),
+            summary = stringResource(if (status.notificationsGranted) R.string.settings_notifications_on else R.string.settings_notifications_off),
+            icon = Icons.Filled.Notifications,
+            granted = status.notificationsGranted,
+            request = actions::requestNotifications,
+        )
+        // Android only lets the user change this one from the system's own page for the app.
+        ActionRow(
+            title = stringResource(R.string.settings_network),
+            summary = stringResource(if (status.networkAllowed) R.string.settings_network_on else R.string.settings_network_off),
+            icon = AssistantIcons.Public,
+            onClick = actions::openAppSettings,
+        )
+        ActionRow(
+            title = stringResource(R.string.settings_permissions_manage),
+            summary = stringResource(R.string.settings_permissions_manage_note),
+            onClick = actions::openAppSettings,
         )
     }
+}
+
+@Composable
+private fun PermissionRow(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    granted: Boolean,
+    request: () -> Unit,
+) {
+    ActionRow(
+        title = title,
+        summary = summary,
+        icon = icon,
+        actionLabel = if (granted) null else stringResource(R.string.step_allow),
+        onClick = if (granted) null else request,
+    )
 }
 
 @Composable
