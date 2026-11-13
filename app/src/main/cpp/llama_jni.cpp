@@ -20,6 +20,7 @@ namespace {
 
 constexpr int kBatchSize = 512;
 constexpr int kParseEveryTokens = 8;
+constexpr size_t kMinTokensWorthSaving = 64;
 
 enum GenerateStatus : jint {
     kOk = 0,
@@ -34,6 +35,9 @@ struct Session {
     common_chat_templates_ptr templates;
     // Tokens currently held in the KV cache, used to reuse the shared prefix between turns.
     std::vector<llama_token> cached;
+    // Where the processed preface is kept between loads; empty when it is not kept.
+    std::string statePath;
+    bool stateTried = false;
 };
 
 using Clock = std::chrono::steady_clock;
@@ -75,7 +79,7 @@ bool decodeTokens(llama_context *ctx, const std::vector<llama_token> &tokens, si
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_dev_localassistant_llm_LlamaCppEngine_nativeLoad(JNIEnv *env, jclass, jstring jpath, jint nCtx,
-                                                      jint nThreads) {
+                                                      jint nThreads, jstring jstate) {
     static bool backendReady = false;
     if (!backendReady) {
         llama_log_set(logCallback, nullptr);
@@ -114,6 +118,9 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeLoad(JNIEnv *env, jclass, jstri
     session->model = model;
     session->ctx = ctx;
     session->templates = common_chat_templates_init(model, "");
+    const char *state = env->GetStringUTFChars(jstate, nullptr);
+    session->statePath = state;
+    env->ReleaseStringUTFChars(jstate, state);
     LOGI("Loaded model, n_ctx=%d threads=%d", nCtx, nThreads);
     return reinterpret_cast<jlong>(session);
 }
@@ -183,6 +190,23 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     std::vector<llama_token> tokens = common_tokenize(ctx, prompt, /*add_special=*/true, /*parse_special=*/true);
     if (tokens.size() + static_cast<size_t>(maxTokens) > llama_n_ctx(ctx)) return kContextOverflow;
 
+    // The instructions and tool definitions are the same on every load and take many seconds to
+    // work through, so a fresh context first takes back what an earlier load saved. Whatever no
+    // longer matches the prompt is dropped by the prefix comparison below, like any stale turn.
+    if (session->cached.empty() && !session->stateTried && !session->statePath.empty()) {
+        session->stateTried = true;
+        std::vector<llama_token> saved(llama_n_ctx(ctx));
+        size_t count = 0;
+        const auto restoreStart = Clock::now();
+        if (llama_state_load_file(ctx, session->statePath.c_str(), saved.data(), saved.size(), &count)) {
+            saved.resize(count);
+            session->cached = std::move(saved);
+            LOGI("Restored %zu saved tokens in %lldms", count, elapsedMs(restoreStart));
+        } else {
+            llama_memory_clear(llama_get_memory(ctx), true);
+        }
+    }
+
     size_t reused = 0;
     while (reused < tokens.size() && reused < session->cached.size() && tokens[reused] == session->cached[reused]) {
         ++reused;
@@ -200,6 +224,13 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     }
     session->cached = tokens;
     const long long prefillMs = elapsedMs(prefillStart);
+    // A call that generates nothing is the preface being prepared: the one state worth keeping,
+    // and only when enough of it had to be worked out to make the next load quicker.
+    if (maxTokens == 0 && !session->statePath.empty() && tokens.size() - reused > kMinTokensWorthSaving) {
+        const auto saveStart = Clock::now();
+        const bool saved = llama_state_save_file(ctx, session->statePath.c_str(), tokens.data(), tokens.size());
+        LOGI("Saved %zu tokens for the next load in %lldms (%s)", tokens.size(), elapsedMs(saveStart), saved ? "ok" : "failed");
+    }
 
     common_params_sampling samplingParams;
     samplingParams.temp = temperature;
@@ -258,6 +289,16 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
         try {
             const common_chat_msg reply = common_chat_parse(raw, /*is_partial=*/false, parserParams);
             LOGI("Parsed: %zu tool calls, content '%s'", reply.tool_calls.size(), reply.content.substr(0, 60).c_str());
+            // Text only goes out every few tokens, so the words after the last of those rounds
+            // are still unsent here; without this every reply lost its ending.
+            if (keepGoing && reply.content.size() > streamed.size()) {
+                const std::string rest = reply.content.substr(streamed.size());
+                jbyteArray chunk = env->NewByteArray(static_cast<jsize>(rest.size()));
+                env->SetByteArrayRegion(chunk, 0, static_cast<jsize>(rest.size()),
+                                        reinterpret_cast<const jbyte *>(rest.data()));
+                env->CallBooleanMethod(callback, onBytes, chunk);
+                env->DeleteLocalRef(chunk);
+            }
             for (const auto &call : reply.tool_calls) {
                 jstring name = env->NewStringUTF(call.name.c_str());
                 jstring arguments = env->NewStringUTF(call.arguments.c_str());

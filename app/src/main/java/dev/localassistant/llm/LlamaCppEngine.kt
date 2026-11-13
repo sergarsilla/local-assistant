@@ -149,13 +149,17 @@ class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
             System.loadLibrary("llama_jni")
         }
 
-        fun load(model: File, contextSize: Int, threads: Int): LlamaCppEngine {
-            val handle = nativeLoad(model.path, contextSize, threads)
+        /**
+         * [prefaceState] is where the processed system prompt and tools are kept between loads,
+         * so a reload reads them back instead of working through them again; null keeps nothing.
+         */
+        fun load(model: File, contextSize: Int, threads: Int, prefaceState: File? = null): LlamaCppEngine {
+            val handle = nativeLoad(model.path, contextSize, threads, prefaceState?.path.orEmpty())
             require(handle != 0L) { "llama.cpp could not load ${model.name}" }
             return LlamaCppEngine(handle)
         }
 
-        @JvmStatic private external fun nativeLoad(path: String, contextSize: Int, threads: Int): Long
+        @JvmStatic private external fun nativeLoad(path: String, contextSize: Int, threads: Int, statePath: String): Long
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeGenerate(
             handle: Long,

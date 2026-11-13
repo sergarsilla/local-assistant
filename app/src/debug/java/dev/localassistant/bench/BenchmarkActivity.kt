@@ -79,7 +79,7 @@ class BenchmarkActivity : Activity() {
         }
         intent.getStringExtra("toolask")?.let { question ->
             thread(name = "toolask") {
-                runCatching { ToolTest(this, ::report).run(question) }.onFailure { report("FAILED toolask: $it") }
+                runCatching { ToolTest(this, ::report).run(question, intent.getBooleanExtra("preload", false)) }.onFailure { report("FAILED toolask: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
             }

@@ -36,8 +36,12 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Keeps history on the phone, if you want.** Conversations are stored in SQLite with
   `secure_delete`; deleting one rewrites the database file so the text is really gone, and saving
   can be turned off. Any conversation can be continued in the assistant.
-- **Costs nothing when idle.** The model is released a few seconds after the panel closes:
-  ~340 MB resident and about 10 ms of CPU per minute.
+- **Costs nothing when idle.** The model stays loaded for five minutes after the panel closes,
+  because questions come in runs and reloading takes seconds; an idle model uses no CPU. After
+  that it is released: ~340 MB resident and about 10 ms of CPU per minute.
+- **Answers the everyday things at once.** Timers, alarms, routes, calls, messages, opening an
+  app, the time and sums are recognised straight from the words in Spanish and English and done
+  in a tenth of a second, with or without a model installed. Everything else goes to the model.
 
 ## Requirements
 

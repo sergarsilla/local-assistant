@@ -190,8 +190,23 @@ class EngineHolder(
         _state.value = EngineState.Idle
     }
 
+    /**
+     * The file a model's processed preface is kept in. Its name changes with anything that makes
+     * the saved state wrong for the model, and the states of other models are removed: each is a
+     * hundred megabytes or so, and only the model in use will ever read its own back.
+     */
+    private fun prefaceState(model: InstalledModel, contextSize: Int): File {
+        val directory = File(context.cacheDir, "preface").apply { mkdirs() }
+        val state = File(directory, "${model.name}-${model.sizeBytes}-${model.file.lastModified()}-$contextSize.state")
+        directory.listFiles()?.filter { it != state }?.forEach { it.delete() }
+        return state
+    }
+
     private fun load(model: InstalledModel): LlmEngine = when (model.format) {
-        ModelFormat.GGUF -> LlamaCppEngine.load(model.file, model.contextTokens ?: CONTEXT_SIZE, THREADS)
+        ModelFormat.GGUF -> {
+            val contextSize = model.contextTokens ?: CONTEXT_SIZE
+            LlamaCppEngine.load(model.file, contextSize, THREADS, prefaceState(model, contextSize))
+        }
         ModelFormat.LITERT_LM -> loadLiteRt(model)
     }
 
@@ -280,7 +295,10 @@ class EngineHolder(
 
         // Measured on a Tensor G5: 4 threads decode as fast as 6 and leave cores for the UI.
         private const val THREADS = 4
-        private const val RELEASE_DELAY_MS = 30_000L
+        // Questions come in runs, minutes apart, and reloading costs about seven seconds each
+        // time. An idle model uses no CPU, and most of what it holds is the mapped file, which
+        // Android takes back by itself when something else needs the memory.
+        private const val RELEASE_DELAY_MS = 5 * 60_000L
         private const val MIN_TOKENS_FOR_SPEED = 16
         private const val KEY_ACCELERATOR = "accelerator"
         private const val KEY_GPU_BROKEN = "gpu_broken"
