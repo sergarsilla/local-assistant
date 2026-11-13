@@ -94,8 +94,9 @@ class CommandRouter {
     }
 
     private fun lookup(said: Said): Command? {
-        val match = LOOKUP.find(said.folded) ?: return null
-        return Command.Lookup(said.original(match.groups[1]!!.range))
+        LOOKUP.find(said.folded)?.let { return Command.Lookup(said.original(it.groups[1]!!.range)) }
+        // News and weather are never something a model can know, so asking for them is a search.
+        return if (CURRENT_AFFAIRS.containsMatchIn(said.folded)) Command.Lookup(said.text) else null
     }
 
     private fun message(said: Said, spanish: Boolean): Command? {
@@ -159,6 +160,7 @@ class CommandRouter {
      */
     private class Said(private val source: String, private val offset: Int, val folded: String) {
         val digits: String = SpokenText.digitize(folded)
+        val text: String get() = original(folded.indices)
 
         fun original(range: IntRange) = source.substring(offset + range.first, offset + range.last + 1).trim()
 
@@ -209,6 +211,10 @@ class CommandRouter {
             """^(?:busca(?:me)?|buscar|googlea|search(?: the web)?(?: for)?|look up|google)""" +
                 """(?: en internet| en la web| en google| on the web| online)? (.+?)""" +
                 """(?: en internet| en la web| en google| on the web| online)?$""",
+        )
+        val CURRENT_AFFAIRS = Regex(
+            """\b(?:noticias|titulares|news|headlines|pronostico|forecast|weather)\b|""" +
+                """\bque tiempo (?:hace|hara|va a hacer)\b|\b(?:va a|will it) (?:llover|rain)\b""",
         )
         val MESSAGES = listOf(
             Regex(

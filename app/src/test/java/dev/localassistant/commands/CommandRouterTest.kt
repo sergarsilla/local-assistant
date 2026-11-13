@@ -78,6 +78,7 @@ class CommandRouterTest {
         assertEquals("aeropuerto", action(es("ruta al aeropuerto")).arguments["destination"])
         assertEquals("casa de Ana", action(es("navega hasta casa de Ana en coche")).arguments["destination"])
         assertEquals("Heathrow", action(en("Navigate to Heathrow")).arguments["destination"])
+        assertEquals("la carretera de Ugena y Yeles", action(es("Llévame a la carretera de Ugena y Yeles.")).arguments["destination"])
         assertEquals("transit", action(en("directions to the British Museum by bus")).arguments["mode"])
 
         val shown = action(es("Enséñame Toledo en el mapa"))
@@ -102,6 +103,8 @@ class CommandRouterTest {
         assertEquals("Spotify", action(es("Abre Spotify")).arguments["name"])
         assertEquals("cámara", action(es("abre la cámara")).arguments["name"])
         assertEquals("Signal", action(en("open the Signal app")).arguments["name"])
+        assertEquals("Telegram", action(es("Abre Telegram.")).arguments["name"])
+        assertNull(es("Ábreme YouTube y dime qué tengo en el feed principal"))
     }
 
     @Test
@@ -130,6 +133,9 @@ class CommandRouterTest {
         assertEquals(Command.Lookup("quién ganó el último Gran Premio"), es("Busca en internet quién ganó el último Gran Premio"))
         assertEquals(Command.Lookup("el tiempo en Madrid"), es("busca el tiempo en Madrid en internet"))
         assertEquals(Command.Lookup("pixel 10 battery life"), en("search for pixel 10 battery life"))
+        assertEquals(Command.Lookup("Cuáles son las noticias principales de hoy"), es("¿Cuáles son las noticias principales de hoy?"))
+        assertEquals(Command.Lookup("qué tiempo hace en Toledo"), es("Oye, ¿qué tiempo hace en Toledo?"))
+        assertEquals(Command.Lookup("What's the weather tomorrow"), en("What's the weather tomorrow?"))
     }
 
     @Test
