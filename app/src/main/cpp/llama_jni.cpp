@@ -77,6 +77,25 @@ bool decodeTokens(llama_context *ctx, const std::vector<llama_token> &tokens, si
     return true;
 }
 
+/**
+ * The rendered chat as tokens. What the user wrote is tokenized as plain text, so nothing said
+ * or typed can pass for one of the model's control tokens.
+ */
+std::vector<llama_token> tokenizePrompt(llama_context *ctx, const common_chat_params &params) {
+    std::vector<llama_token> tokens;
+    for (const common_chat_prompt_part &part : params.prompt.parts) {
+        const std::vector<llama_token> ids =
+            common_tokenize(ctx, part.text, /*add_special=*/tokens.empty(), /*parse_special=*/!part.is_input);
+        tokens.insert(tokens.end(), ids.begin(), ids.end());
+    }
+    // The template leaves the assistant's turn header out of the prompt; without it the model
+    // writes the header itself and the reply parser cannot find the tool calls.
+    const std::vector<llama_token> header =
+        common_tokenize(ctx, params.generation_prompt, /*add_special=*/tokens.empty(), /*parse_special=*/true);
+    tokens.insert(tokens.end(), header.begin(), header.end());
+    return tokens;
+}
+
 size_t commonPrefix(const std::vector<llama_token> &a, const std::vector<llama_token> &b) {
     size_t n = 0;
     while (n < a.size() && n < b.size() && a[n] == b[n]) ++n;
@@ -204,16 +223,12 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     const common_chat_params chatParams = common_chat_templates_apply(session->templates.get(), inputs);
     LOGI("Chat format: %s (%zu tools)", common_chat_format_name(chatParams.format), inputs.tools.size());
     common_chat_parser_params parserParams(chatParams);
-    // Tool-call formats come with a PEG grammar; without loading it the parser only sees text.
-    if (!chatParams.parser.empty()) parserParams.parser.load(chatParams.parser);
-    parserParams.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
+    // Tool-call formats come with a PEG grammar; without it the parser only sees text.
+    parserParams.parser = chatParams.parser;
 
     llama_context *ctx = session->ctx;
     const llama_vocab *vocab = llama_model_get_vocab(session->model);
-    // The template leaves the assistant's turn header out of the prompt; without it the model
-    // writes the header itself and the reply parser cannot find the tool calls.
-    const std::string prompt = chatParams.prompt + chatParams.generation_prompt;
-    std::vector<llama_token> tokens = common_tokenize(ctx, prompt, /*add_special=*/true, /*parse_special=*/true);
+    std::vector<llama_token> tokens = tokenizePrompt(ctx, chatParams);
     if (tokens.size() + static_cast<size_t>(maxTokens) > llama_n_ctx(ctx)) return kContextOverflow;
 
     // Preparing generates nothing, so only what every conversation starts with is worked out
@@ -223,8 +238,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
         common_chat_templates_inputs other = inputs;
         other.messages.back().content = "#";
         const common_chat_params otherParams = common_chat_templates_apply(session->templates.get(), other);
-        const std::vector<llama_token> otherTokens = common_tokenize(
-            ctx, otherParams.prompt + otherParams.generation_prompt, /*add_special=*/true, /*parse_special=*/true);
+        const std::vector<llama_token> otherTokens = tokenizePrompt(ctx, otherParams);
         tokens.resize(commonPrefix(tokens, otherTokens));
         if (tokens.empty()) return kOk;
     }
@@ -309,7 +323,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
         if (generated % kParseEveryTokens == 0) {
             const auto parseStart = Clock::now();
             try {
-                content = common_chat_parse(raw, /*is_partial=*/true, parserParams).content;
+                content = common_chat_parse(common_chat_input(raw), /*is_partial=*/true, parserParams).content;
             } catch (const std::exception &) {
                 content = streamed;
             }
@@ -340,7 +354,7 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     LOGI("Raw reply (%d tokens, %lldms parsing): |%s|", generated, parseUs / 1000, raw.substr(0, 100).c_str());
     if (status == kOk) {
         try {
-            const common_chat_msg reply = common_chat_parse(raw, /*is_partial=*/false, parserParams);
+            const common_chat_msg reply = common_chat_parse(common_chat_input(raw), /*is_partial=*/false, parserParams);
             LOGI("Parsed: %zu tool calls, content '%s'", reply.tool_calls.size(), reply.content.substr(0, 60).c_str());
             // Text only goes out every few tokens, so the words after the last of those rounds
             // are still unsent here; without this every reply lost its ending.
