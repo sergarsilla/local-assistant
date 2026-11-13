@@ -25,7 +25,14 @@ class WebSearchTool(private val listener: ToolActivityListener) : AssistantTool 
     override fun run(arguments: JSONObject): String {
         val query = arguments.optString("query").ifBlank { return error("missing query") }
         listener.onToolStarted(name, query)
+        // The first request after a while often times out on a connection that has gone stale,
+        // and the next one goes through, so one failure is not yet an answer for the user.
         return runCatching { search(query) }
+            .recoverCatching {
+                Log.w(TAG, "Search failed, trying once more: $it")
+                Thread.sleep(RETRY_PAUSE_MS)
+                search(query)
+            }
             .onFailure { Log.w(TAG, "Search failed", it) }
             .getOrElse { error(it.message ?: "search failed") }
     }
@@ -34,7 +41,7 @@ class WebSearchTool(private val listener: ToolActivityListener) : AssistantTool 
         val url = "https://html.duckduckgo.com/html/?q=" + URLEncoder.encode(query, "UTF-8")
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
-            readTimeout = 15_000
+            readTimeout = 8_000
             setRequestProperty("User-Agent", USER_AGENT)
         }
         val html = try {
@@ -75,6 +82,7 @@ class WebSearchTool(private val listener: ToolActivityListener) : AssistantTool 
     private companion object {
         const val TAG = "WebSearchTool"
         const val MAX_RESULTS = 5
+        const val RETRY_PAUSE_MS = 400L
         const val USER_AGENT = "Mozilla/5.0 (Android) LocalAssistant"
         val RESULT = Regex("""<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
         val SNIPPET = Regex("""class="result__snippet"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
