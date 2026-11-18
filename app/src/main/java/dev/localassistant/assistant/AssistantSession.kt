@@ -73,7 +73,6 @@ class AssistantSession(context: Context) :
         super.onCreate()
         savedStateController.performRestore(null)
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
-        window.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
     override fun onCreateContentView(): View {
@@ -115,12 +114,14 @@ class AssistantSession(context: Context) :
         val byWakeWord = args?.getBoolean(AssistantService.EXTRA_WAKE_WORD, false) == true
         // The panel needs the microphone; the wake word spotter lets go of it until the panel closes.
         AssistantRuntime.wakeWord.setPaused(true)
+        AssistantRuntime.engine.keepLoaded()
         WakeWordService.syncWithSettings(context)
         // Loading the model and the voices saturates every core for over a second. Started here
         // they compete with the panel's own first frames, so they wait until it is on screen:
         // the user is still reading it, and nothing they can do needs the model this soon.
         val willListen = byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen
         afterFirstFrame {
+            stopPanning()
             AssistantRuntime.engine.preload(chat::preface)
             voice.preload(imminent = willListen)
         }
@@ -139,6 +140,8 @@ class AssistantSession(context: Context) :
     override fun onHide() {
         super.onHide()
         AssistantRuntime.tools.activityStarter = null
+        // A message left unconfirmed must not be waiting, armed, the next time the panel opens.
+        AssistantRuntime.tools.actions.clear()
         screen.clear()
         chat.stop()
         voice.onHide()
@@ -164,6 +167,22 @@ class AssistantSession(context: Context) :
     }
 
     /** Runs [work] on the main thread once the panel has actually been drawn, and only once. */
+    /**
+     * The panel moves itself out of the keyboard's way, so the system must not do it as well: it
+     * pans this window by the keyboard's height, and together the sheet went to the top of the
+     * screen with an empty band where it should have been. The mode only reaches a window that
+     * is already on screen through the window manager; set any earlier, the system replaces it.
+     */
+    private fun stopPanning() {
+        val panel = window.window ?: return
+        val decor = panel.decorView
+        if (!decor.isAttachedToWindow) return
+        val attributes = panel.attributes
+        attributes.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        runCatching { panel.windowManager.updateViewLayout(decor, attributes) }
+            .onFailure { Log.w(AssistantService.TAG, "Could not set the panel's keyboard mode", it) }
+    }
+
     private fun afterFirstFrame(work: () -> Unit) {
         val decor = window.window?.decorView ?: return work()
         decor.viewTreeObserver.addOnDrawListener(object : ViewTreeObserver.OnDrawListener {

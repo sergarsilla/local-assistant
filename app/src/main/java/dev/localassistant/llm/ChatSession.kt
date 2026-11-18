@@ -7,6 +7,7 @@ import dev.localassistant.commands.CommandRouter
 import dev.localassistant.commands.SpokenText
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.tools.AssistantTool
+import dev.localassistant.tools.RESOLVED
 import dev.localassistant.tools.ToolRegistry
 import org.json.JSONArray
 import org.json.JSONObject
@@ -42,7 +43,12 @@ data class UiMessage(
 )
 
 /** What was on screen, to send along with a question. */
-class ScreenAttachment(val text: String?, val image: ByteArray?)
+class ScreenAttachment(
+    val text: String?,
+    val image: ByteArray?,
+    /** The question is about the screen, but the user has not let the assistant look at it. */
+    val withheld: Boolean = false,
+)
 
 /** Receives the reply as it streams, e.g. to speak it aloud. */
 interface ReplyListener {
@@ -104,7 +110,9 @@ class ChatSession(
         previous?.cancel()
         val myTurn = ++turn
         _generating.value = true
-        val screen = screenFor(prompt)
+        val offered = screenFor(prompt)
+        val withheld = offered?.withheld == true
+        val screen = offered?.takeUnless { withheld }
         val question = UiMessage(
             role = Role.USER,
             text = prompt,
@@ -120,7 +128,13 @@ class ChatSession(
             _messages.update { it + question + UiMessage(Role.ASSISTANT, "", streaming = true) }
             try {
                 persist(Role.USER, prompt)
-                if (!answerDirectly(prompt, listener)) holder.use { engine -> generateFitting(engine, listener) }
+                if (withheld) {
+                    say(
+                        if (language() == "es") "Para que mire la pantalla, activa «Pantalla» abajo y vuelve a preguntar."
+                        else "To let me look at the screen, turn on Screen below and ask again.",
+                        listener,
+                    )
+                } else if (!answerDirectly(prompt, listener)) holder.use { engine -> generateFitting(engine, listener) }
             } catch (e: NoModelException) {
                 _error.value = ChatError.NoModel
                 dropEmptyReply()
@@ -159,21 +173,23 @@ class ChatSession(
                 }
                 Log.i(TAG, "Command ${command.tool} -> ${result.toString().take(120)}")
                 if (result == null || result.has("error")) return false
-                command.confirmation
+                val resolved = result.optString(RESOLVED)
+                if (command.subject != null && resolved.isNotEmpty()) {
+                    command.confirmation.replace(command.subject, resolved)
+                } else {
+                    command.confirmation
+                }
             }
             is Command.Lookup -> {
+                // Without search, or when it fails, the model still answers: it can say it has no
+                // access, or answer what it knows, which beats a fixed refusal for a question
+                // that only looked like it needed the web.
                 val search = tools?.takeIf { it.webSearchEnabled() }?.available()?.firstOrNull { it.name == WEB_SEARCH }
-                    ?: return say(
-                        if (spanish) "La búsqueda en internet está desactivada. Actívala en Ajustes." else "Web search is turned off. Turn it on in Settings.",
-                        listener,
-                    )
+                    ?: return false
                 val results = withContext(Dispatchers.IO) {
                     runCatching { JSONObject(search.run(JSONObject().put("query", command.query))) }.getOrNull()
                 }?.optJSONArray("results")?.takeIf { it.length() > 0 }
-                    ?: return say(
-                        if (spanish) "No he podido buscar en internet ahora mismo." else "I could not search the web just now.",
-                        listener,
-                    )
+                    ?: return false
                 // The results go in with the question, so the model only has to read them: it
                 // is spared the decision to search, which is the step small models get wrong.
                 _messages.update { list ->
@@ -261,8 +277,17 @@ class ChatSession(
         // live conversation already holds the earlier ones.
         val shown = _messages.value.dropLast(1)
         val history = shown.mapIndexed { index, message ->
-            val image = message.image?.takeIf { index == shown.lastIndex && engine.supportsImages }
-            ChatMessage(message.role, message.modelText, image = image)
+            val latest = index == shown.lastIndex
+            val image = message.image?.takeIf { latest && engine.supportsImages }
+            // Told a screenshot was attached that it could not see, a model described a screen
+            // it made up; it is only told about one it actually receives.
+            val text = when {
+                !latest || message.image == null || message.modelText.contains(SCREEN_TEXT_MARK) -> message.modelText
+                image != null -> "(A screenshot of the user's screen is attached.)\n" + message.modelText
+                else -> "(The user asked about their screen, but it cannot be seen with the current settings. " +
+                    "Say so in one sentence.)\n" + message.modelText
+            }
+            ChatMessage(message.role, text, image = image)
         }
         var skip = 0
         while (true) {
@@ -359,11 +384,8 @@ class ChatSession(
         // to do with it: a greeting came back with the full date and time read out.
         clock = if (TIME_WORDS.containsMatchIn(SpokenText.fold(question))) clockLine() else ""
         if (clock.isNotEmpty()) appendLine(clock)
-        if (screenText.isNullOrBlank() && screen?.image != null) {
-            appendLine("(A screenshot of the user's screen is attached.)")
-        }
         if (!screenText.isNullOrBlank()) {
-            appendLine("Text on the user's screen:")
+            appendLine(SCREEN_TEXT_MARK)
             appendLine("<<<")
             appendLine(screenText)
             appendLine(">>>")
@@ -394,6 +416,10 @@ class ChatSession(
                 append("further help. No tables, no headings, no bullet lists unless the user asks for a list. ")
                 append("Spell out what will be spoken: no asterisks, no emoji, no URLs read character by character. ")
 
+                // "Mi hermanito, mira la pantalla" was answered with the user's little brother's
+                // parcel: a model reads a nickname for itself as a third person.
+                append("The user talks casually, with slang and sometimes swearing. Words like bro, tío, hermano, ")
+                append("hermanito, colega or mate are how they address you, never other people. ")
                 append("Answer what was actually asked, and treat the user as an adult who owns this phone and ")
                 append("means what they say. Do not lecture, warn, moralise, or add disclaimers. ")
                 append("If you genuinely cannot do something, say so in one sentence and stop. ")
@@ -424,6 +450,7 @@ class ChatSession(
         const val MAX_TOOL_ROUNDS = 4
         const val WEB_SEARCH = "web_search"
         const val THINK_END = "</think>"
+        const val SCREEN_TEXT_MARK = "Text on the user's screen:"
         val TIME_WORDS = Regex(
             """\b(?:hoy|manana|ayer|anoche|ahora|hora|horas|dia|dias|fecha|semana|mes|ano|cuando|tarde|noche|""" +
                 """lunes|martes|miercoles|jueves|viernes|sabado|domingo|evento|cita|reunion|calendario|recuerdame|""" +

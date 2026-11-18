@@ -46,6 +46,18 @@ class BenchmarkActivity : Activity() {
     @OptIn(ExperimentalApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.getBooleanExtra("panel", false)) {
+            // Opens the panel over whatever app was in front before this activity, once it is
+            // gone, so the panel gets that app's screen the way the assistant gesture would.
+            finish()
+            android.os.Handler(mainLooper).postDelayed({ 
+                dev.localassistant.assistant.AssistantService.open(
+                    flags = android.service.voice.VoiceInteractionSession.SHOW_WITH_ASSIST or
+                        android.service.voice.VoiceInteractionSession.SHOW_WITH_SCREENSHOT,
+                )
+            }, PANEL_DELAY_MS)
+            return
+        }
         intent.getStringExtra("install")?.let { return install(it) }
         intent.getStringExtra("download")?.let { spec ->
             val (repo, path) = spec.substringBeforeLast(':') to spec.substringAfterLast(':')
@@ -313,6 +325,7 @@ class BenchmarkActivity : Activity() {
     companion object {
         private const val TAG = "LocalAssistantBench"
         private const val RESULTS_FILE = "results.txt"
+        private const val PANEL_DELAY_MS = 1_500L
         private const val PREFILL_TOKENS = 256
         private const val DECODE_TOKENS = 128
         private const val LONG_PROMPT =

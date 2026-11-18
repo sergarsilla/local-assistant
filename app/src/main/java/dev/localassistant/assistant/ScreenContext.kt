@@ -24,7 +24,7 @@ class ScreenContext {
 
     private val _attach = MutableStateFlow(false)
 
-    /** The panel's "Screen" chip: send what is on screen with every question. */
+    /** The panel's "Screen" chip: whether the assistant may look at the screen at all. */
     val attach: StateFlow<Boolean> = _attach.asStateFlow()
 
     fun setAttach(value: Boolean) {
@@ -32,15 +32,16 @@ class ScreenContext {
     }
 
     /**
-     * What to send with [question]: always when the chip is on, and also when the question
-     * itself is about the screen ("resume esto", "what does this say"), so asking out loud works
-     * without touching anything.
+     * What to send with [question]: the screen when the chip is on, and nothing when it is off.
+     * Off used to mean "only when asked about it", so the chip could read "off" while the
+     * assistant read the screen; a question about the screen with the chip off is now marked
+     * withheld, so the user can be told how to allow it.
      */
     fun attachmentFor(question: String): ScreenAttachment? {
         val text = _text.value
         val image = _image.value
         if (text == null && image == null) return null
-        if (!_attach.value && !mentionsScreen(question)) return null
+        if (!_attach.value) return if (mentionsScreen(question)) ScreenAttachment(null, null, withheld = true) else null
         return ScreenAttachment(text, image)
     }
 

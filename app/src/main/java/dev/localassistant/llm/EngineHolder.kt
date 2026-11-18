@@ -76,6 +76,15 @@ class EngineHolder(
     @Volatile
     private var releaseJob: Job? = null
 
+    /**
+     * Set when the panel closed and the model should go once idle. Using the model cancels the
+     * countdown while it works, so this is what makes it start again afterwards: the preparation
+     * started as the panel opened often finishes after it has closed, and used to leave the
+     * model in memory for days.
+     */
+    @Volatile
+    private var releaseWanted = false
+
     private val prefs = context.getSharedPreferences("engine", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Idle)
@@ -103,7 +112,17 @@ class EngineHolder(
     /** Runs [block] with the active model loaded, holding it exclusively until the block returns. */
     suspend fun <T> use(block: suspend (LlmEngine) -> T): T = useMutex.withLock {
         cancelRelease()
-        block(acquireLocked())
+        try {
+            block(acquireLocked())
+        } finally {
+            if (releaseWanted) armRelease(RELEASE_DELAY_MS)
+        }
+    }
+
+    /** The panel is open: the model stays until [scheduleRelease]. */
+    fun keepLoaded() {
+        releaseWanted = false
+        cancelRelease()
     }
 
     private suspend fun acquireLocked(): LlmEngine = stateMutex.withLock {
@@ -129,6 +148,11 @@ class EngineHolder(
     }
 
     fun scheduleRelease(delayMillis: Long = RELEASE_DELAY_MS) {
+        releaseWanted = true
+        armRelease(delayMillis)
+    }
+
+    private fun armRelease(delayMillis: Long) {
         cancelRelease()
         releaseJob = scope.launch {
             delay(delayMillis)

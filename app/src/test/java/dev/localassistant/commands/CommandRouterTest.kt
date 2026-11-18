@@ -149,6 +149,46 @@ class CommandRouterTest {
     }
 
     @Test
+    fun `undoing or asking about an alarm or timer never sets one`() {
+        val said = listOf(
+            "Quita la alarma de las 7", "Borra la alarma de las 8", "Apaga la alarma de las 7 y media",
+            "Cancel the alarm at 7", "Delete my 6:30 alarm", "Is my alarm set for 7?", "Did I set an alarm for 7?",
+            "¿Tengo alarma a las 7?", "Si pongo la alarma a las 7, ¿cuántas horas duermo?",
+            "Cancela el temporizador de 5 minutos", "Stop the 5 minute timer", "Mi temporizador de 10 minutos no suena",
+        )
+        for (text in said) {
+            val command = es(text) ?: en(text)
+            assertTrue("$text -> $command", command !is Command.Action || command.tool !in setOf("set_alarm", "set_timer"))
+        }
+    }
+
+    @Test
+    fun `actions are recognised before searches`() {
+        assertEquals("send_message", action(es("Dile a Ana que tengo noticias")).tool)
+        assertEquals("send_message", action(es("Mándale un mensaje a mamá diciendo que mañana va a llover")).tool)
+        assertEquals("set_alarm", action(es("Pon una alarma a las 7 para ver las noticias")).tool)
+        assertEquals("set_timer", action(es("Pon un temporizador de 10 minutos para el pronóstico")).tool)
+        assertEquals("open_app", action(es("Abre Google News")).tool)
+        assertEquals("open_app", action(en("Open the weather app")).tool)
+    }
+
+    @Test
+    fun `phrases that only look like commands are left to the model`() {
+        val said = listOf(
+            "¿Cómo llegar a ser feliz?", "Cómo llego a fin de mes", "How do I get to sleep faster?",
+            "How to get to the next level in Zelda", "Take me to the next song", "Llévame a la luna",
+            "Tell me that joke again", "Ring a bell", "Llama la atención", "Call me Ishmael",
+            "¿A qué temperatura hierve el agua?", "What is the last book of the Bible?",
+            "¿Cuál es la última letra del abecedario?", "¿Qué es lo último que te dije?",
+        )
+        for (text in said) {
+            val command = es(text) ?: en(text)
+            assertTrue("$text -> $command", command == null)
+        }
+        assertEquals("It's 9:30.", answer(en("What time is it right now?")))
+    }
+
+    @Test
     fun `anything that is not plainly a command goes to the model`() {
         val questions = listOf(
             "¿Qué es un temporizador?",

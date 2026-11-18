@@ -13,6 +13,7 @@ object ContactMatcher {
     private val FILLER = setOf("a", "al", "el", "la", "mi", "my", "to", "the", "de")
     private const val EXACT = 0
     private const val PREFIX = 3
+    private const val MIN_PREFIX = 3
 
     /** Contacts ranked by how well they match [query]; only real matches are returned. */
     fun match(query: String, contacts: List<Contact>): List<Contact> {
@@ -34,7 +35,9 @@ object ContactMatcher {
         for (word in wanted) {
             total += when {
                 name.any { it == word } -> EXACT
-                name.any { it.startsWith(word) || word.startsWith(it) } -> PREFIX
+                // Only what was said can be the shorter one, and not by much: an initial in the
+                // address book used to match any word starting with that letter.
+                word.length >= MIN_PREFIX && name.any { it.startsWith(word) } -> PREFIX
                 else -> return null
             }
         }

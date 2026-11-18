@@ -133,7 +133,7 @@ class OpenAppTool(
                 .toString()
         val intent = packages.getLaunchIntentForPackage(match.first)
             ?: return JSONObject().put("error", "app cannot be opened").toString()
-        return start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}")
+        return start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}", resolved = match.second)
     }
 
     private companion object {
@@ -169,11 +169,12 @@ object AppMatcher {
         val labelWords = label.split(' ', '.', '-').filter { it.isNotEmpty() }
         if (wantedWords.isEmpty() || labelWords.isEmpty()) return Int.MAX_VALUE
         // A word matches when both share a long enough stem, which also covers "calculadora"
-        // against "Calculator".
+        // against "Calculator". Short words have to match whole: "door" opened DoorDash.
         val matched = wantedWords.count { word ->
-            labelWords.any { sharedPrefix(it, word) >= minOf(STEM_LENGTH, word.length, it.length) }
+            labelWords.any { it == word || sharedPrefix(it, word) >= STEM_LENGTH }
         }
-        if (matched == 0) return if (wanted in packageName) PACKAGE_ONLY else Int.MAX_VALUE
+        val packageWord = wanted.replace(" ", "")
+        if (matched == 0) return if (packageName.split('.').any { it == packageWord }) PACKAGE_ONLY else Int.MAX_VALUE
         return (wantedWords.size - matched) * WORD_WEIGHT + (labelWords.size - matched) + 1
     }
 
@@ -259,8 +260,9 @@ class SendMessageTool(
         val recipient = arguments.optString("recipient").ifBlank { return error("missing recipient") }
         val text = arguments.optString("text").ifBlank { return error("missing text") }
         listener.onToolStarted(name, recipient)
+        var shownAs = recipient
         val number = when (val resolved = resolveRecipient(recipient, contacts)) {
-            is Recipient.Found -> resolved.contact.number
+            is Recipient.Found -> resolved.contact.also { shownAs = it.name }.number
             is Recipient.Unresolved -> return resolved.json
             // Without the permission the messaging app asks who to send it to.
             Recipient.NoPermission -> ""
@@ -277,8 +279,9 @@ class SendMessageTool(
                 .putExtra(Intent.EXTRA_TEXT, text)
                 .setPackage(WHATSAPP_PACKAGE)
         }
-        queue.propose(PendingAction(ActionKind.MESSAGE, "$recipient: $text", intent))
-        return JSONObject().put("status", "waiting for the user to confirm").toString()
+        // The card names who it will really go to, which is not always who was said.
+        queue.propose(PendingAction(ActionKind.MESSAGE, "$shownAs: $text", intent))
+        return JSONObject().put("status", "waiting for the user to confirm").put(RESOLVED, shownAs).toString()
     }
 }
 
@@ -308,7 +311,7 @@ class CallTool(
         }
         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(contact.number)}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(launcher, intent, "dialer opened for ${contact.name}; the user taps to call")
+        return start(launcher, intent, "dialer opened for ${contact.name}; the user taps to call", resolved = contact.name)
     }
 }
 
@@ -405,7 +408,16 @@ class YouTubeTool(private val launcher: ActivityLauncher, private val listener: 
     }
 }
 
-private fun start(launcher: ActivityLauncher, intent: Intent, done: String, leavesPanel: Boolean = true): String = runCatching {
+/** Key of the contact or app an action actually went to, when a name was resolved. */
+const val RESOLVED = "resolved"
+
+private fun start(
+    launcher: ActivityLauncher,
+    intent: Intent,
+    done: String,
+    leavesPanel: Boolean = true,
+    resolved: String? = null,
+): String = runCatching {
     launcher.launch(intent, leavesPanel)
-    JSONObject().put("status", done).toString()
+    JSONObject().put("status", done).apply { resolved?.let { put(RESOLVED, it) } }.toString()
 }.getOrElse { JSONObject().put("error", it.message ?: "could not start the action").toString() }
