@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.util.Log
 import dev.localassistant.llm.ChatSession
 import dev.localassistant.llm.ReplyListener
+import dev.localassistant.loggable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,7 +109,7 @@ class VoiceController(
                 val started = System.currentTimeMillis()
                 captures?.save(captured.samples)
                 val text = holder.transcribe(pack, captured.samples, prefs.language)
-                Log.i(TAG, "Heard '$text' in ${System.currentTimeMillis() - started}ms")
+                Log.i(TAG, "Heard ${loggable(text)} in ${System.currentTimeMillis() - started}ms")
                 if (text.isNotBlank()) chat.send(text, spokenReplyListener())
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -143,21 +144,21 @@ class VoiceController(
         listenJob = scope.launch {
             try {
                 holder.preload(pack)
-                // When the reply ends, whatever the microphone was recording is the assistant's
+                // When the voice stops, whatever the microphone was recording is the assistant's
                 // own voice, so that audio is thrown away before listening for the next turn.
                 launch {
-                    speaker.speaking.collect { speaking -> if (!speaking) captureReset.request() }
+                    speaker.audible.collect { audible -> if (!audible) captureReset.request() }
                 }
                 // The call path would cancel the echo, but it also cuts everything above 4 kHz and
                 // ramps its gain slowly, which wrecks recognition. Wideband capture wins; the reply
                 // is interrupted by tapping instead.
                 microphone.listen(continuous = true, reset = captureReset).collect { event ->
                     when (event) {
-                        is ListenEvent.Level -> if (!speaker.speaking.value) {
+                        is ListenEvent.Level -> if (!speaker.audible.value) {
                             _state.value = VoiceState.Listening(event.rms, hearingSpeech = false)
                         }
                         ListenEvent.SpeechStarted ->
-                            if (!speaker.speaking.value) _state.value = VoiceState.Listening(0f, hearingSpeech = true)
+                            if (!speaker.audible.value) _state.value = VoiceState.Listening(0f, hearingSpeech = true)
                         is ListenEvent.Utterance -> handle(event, pack, prefs)
                         ListenEvent.NoSpeech -> Log.i(TAG, "Conversation ended after a long silence")
                     }
@@ -184,8 +185,9 @@ class VoiceController(
     fun ask(text: String) = chat.send(text, spokenReplyListener())
 
     private suspend fun handle(utterance: ListenEvent.Utterance, pack: VoicePack, prefs: VoicePreferences) {
-        if (speaker.speaking.value) {
-            // Recorded while the reply was audible, so it is the assistant's own voice.
+        // Only audio recorded while the voice was coming out is its echo; what the user says while
+        // the answer is still being worked out is a correction or an addition, and is sent on.
+        if (speaker.audible.value) {
             Log.i(TAG, "Dropped audio captured while speaking")
             return
         }
@@ -197,7 +199,7 @@ class VoiceController(
         captures?.save(utterance.samples)
         _state.value = VoiceState.Transcribing
         val text = holder.transcribe(pack, utterance.samples, prefs.language)
-        Log.i(TAG, "Heard '$text' (${durationMs}ms, peak=${utterance.peakLevel})")
+        Log.i(TAG, "Heard ${loggable(text)} (${durationMs}ms, peak=${utterance.peakLevel})")
         if (text.isBlank() || echoes(text)) {
             // Last safety net: if the words repeat the reply, the cancellation let an echo through.
             if (text.isNotBlank()) Log.i(TAG, "Discarded as echo of the reply")

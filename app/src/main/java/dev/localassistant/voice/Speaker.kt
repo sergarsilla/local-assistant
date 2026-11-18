@@ -56,6 +56,15 @@ class Speaker(
     private val _speaking = MutableStateFlow(false)
     val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
 
+    private val _audible = MutableStateFlow(false)
+
+    /**
+     * True only while sound is actually coming out. [speaking] is already true while the model
+     * is still working out what to say, and the microphone treating that silence as the
+     * assistant's own voice threw away whatever the user said in it.
+     */
+    val audible: StateFlow<Boolean> = _audible.asStateFlow()
+
     /** Everything said in the current reply, used to tell real speech from the assistant's echo. */
     @Volatile
     var spokenSoFar: String = ""
@@ -156,6 +165,7 @@ class Speaker(
             }
         }
         _speaking.value = false
+        _audible.value = false
     }
 
     /** Frees this panel's audio; the voices themselves stay cached for the next panel. */
@@ -181,9 +191,25 @@ class Speaker(
     private suspend fun play(audio: Channel<FloatArray>, sampleRate: Int) {
         val out = synchronized(this) { trackFor(sampleRate) }
         out.play()
-        val startedAt = System.currentTimeMillis()
+        val frames = try {
+            playInto(out, audio, sampleRate)
+        } finally {
+            _audible.value = false
+        }
+        val audioMs = frames * 1000L / sampleRate
+        Log.i(TAG, "Spoke ${audioMs}ms of audio")
+        runCatching { out.stop() }
+    }
+
+    /** Writes the reply's audio and waits it out; returns how many frames were played. */
+    private suspend fun playInto(out: AudioTrack, audio: Channel<FloatArray>, sampleRate: Int): Int {
+        var startedAt = System.currentTimeMillis()
         var frames = 0
         for (samples in audio) {
+            if (frames == 0) {
+                startedAt = System.currentTimeMillis()
+                _audible.value = true
+            }
             var offset = 0
             while (offset < samples.size && currentCoroutineContext().isActive) {
                 val written = out.write(samples, offset, samples.size - offset, AudioTrack.WRITE_BLOCKING)
@@ -198,8 +224,7 @@ class Speaker(
         while (currentCoroutineContext().isActive && System.currentTimeMillis() - startedAt < audioMs) {
             delay(DRAIN_POLL_MS)
         }
-        Log.i(TAG, "Spoke ${audioMs}ms of audio")
-        runCatching { out.stop() }
+        return frames
     }
 
     private fun trackFor(sampleRate: Int): AudioTrack {
