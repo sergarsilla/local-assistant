@@ -7,7 +7,13 @@ import java.util.Locale
 /** Something the user asked for that needs no language model to understand. */
 sealed interface Command {
     /** Run [tool] with [arguments] and, if it worked, say [confirmation]. */
-    data class Action(val tool: String, val arguments: Map<String, Any>, val confirmation: String) : Command
+    data class Action(
+        val tool: String,
+        val arguments: Map<String, Any>,
+        val confirmation: String,
+        /** The name as said, which the tool may resolve to a contact or an app by another name. */
+        val subject: String? = null,
+    ) : Command
 
     /** The answer is already known. */
     data class Answer(val text: String) : Command
@@ -29,9 +35,9 @@ class CommandRouter {
 
     fun match(utterance: String, spanish: Boolean, now: LocalDateTime = LocalDateTime.now()): Command? {
         val said = Said.of(utterance) ?: return null
+        // Actions before searches: "dile a Ana que tengo noticias" is a message, not the news.
         return showOnMap(said, spanish)
             ?: youtube(said, spanish)
-            ?: lookup(said)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
             ?: navigate(said, spanish)
@@ -40,8 +46,16 @@ class CommandRouter {
             ?: openApp(said, spanish)
             ?: clock(said, spanish, now)
             ?: sum(said, spanish)
-            ?: recent(said)
+            ?: searches(said)
     }
+
+    private fun searches(said: Said): Command? = lookup(said) ?: recent(said)
+
+    /**
+     * Removing or asking about an alarm is not a request for one, and the clock app sets it
+     * without showing anything: "quita la alarma de las 7" used to set one for seven.
+     */
+    private fun undoesOrAsks(said: Said) = UNDO.containsMatchIn(said.digits) || QUESTION.containsMatchIn(said.digits)
 
     /**
      * A question about how things stand now. A model answers these from memory, fluently and
@@ -54,7 +68,7 @@ class CommandRouter {
     private fun timer(said: Said, spanish: Boolean): Command? {
         val reminder = REMIND_IN.containsMatchIn(said.digits)
         if (!reminder && !TIMER_WORD.containsMatchIn(said.digits)) return null
-        if (QUESTION.containsMatchIn(said.digits)) return null
+        if (undoesOrAsks(said)) return null
         val seconds = SpokenText.seconds(said.digits)?.takeIf { it <= MAX_TIMER_SECONDS } ?: return null
         val length = SpokenText.spokenDuration(seconds, spanish)
         return Command.Action(
@@ -65,7 +79,7 @@ class CommandRouter {
     }
 
     private fun alarm(said: Said, spanish: Boolean, now: LocalDateTime): Command? {
-        if (!ALARM_WORD.containsMatchIn(said.digits) || QUESTION.containsMatchIn(said.digits)) return null
+        if (!ALARM_WORD.containsMatchIn(said.digits) || undoesOrAsks(said)) return null
         val (hour, minute) = ClockTime.parse(said.digits, now) ?: return null
         val time = "%02d:%02d".format(hour, minute)
         return Command.Action(
@@ -85,7 +99,7 @@ class CommandRouter {
             mode = travel
             break
         }
-        if (destination.isBlank()) return null
+        if (destination.isBlank() || NOT_A_PLACE.containsMatchIn(SpokenText.fold(destination))) return null
         return Command.Action(
             "open_maps",
             mapOf("destination" to destination, "navigate" to true, "mode" to mode),
@@ -123,22 +137,24 @@ class CommandRouter {
         val match = MESSAGES.firstNotNullOfOrNull { it.find(said.folded) } ?: return null
         val recipient = said.original(match.groups[1]!!.range)
         val text = said.original(match.groups[2]!!.range).replaceFirstChar { it.uppercase() }
-        if (recipient.split(' ').size > MAX_NAME_WORDS) return null
+        if (!plausibleName(recipient)) return null
         return Command.Action(
             "send_message",
             mapOf("recipient" to recipient, "text" to text),
             if (spanish) "Mensaje para $recipient preparado. Confírmalo en pantalla." else "Message to $recipient is ready. Confirm it on screen.",
+            subject = recipient,
         )
     }
 
     private fun call(said: Said, spanish: Boolean): Command? {
         val match = CALL.find(said.folded) ?: return null
         val recipient = said.original(match.groups[1]!!.range)
-        if (recipient.split(' ').size > MAX_NAME_WORDS) return null
+        if (!plausibleName(recipient)) return null
         return Command.Action(
             "call_contact",
             mapOf("recipient" to recipient),
             if (spanish) "Abro el teléfono para llamar a $recipient." else "Opening the dialer to call $recipient.",
+            subject = recipient,
         )
     }
 
@@ -150,7 +166,14 @@ class CommandRouter {
             "open_app",
             mapOf("name" to name),
             if (spanish) "Abriendo $name." else "Opening $name.",
+            subject = name,
         )
+    }
+
+    /** "me", "la atención", "him": the words after "call" or "tell" that are not a person. */
+    private fun plausibleName(name: String): Boolean {
+        val words = SpokenText.fold(name).split(' ')
+        return words.size <= MAX_NAME_WORDS && words.first() !in NOT_A_NAME
     }
 
     private fun clock(said: Said, spanish: Boolean, now: LocalDateTime): Command? = when {
@@ -206,7 +229,25 @@ class CommandRouter {
         const val MAX_TIMER_SECONDS = 86_400
         const val MAX_NAME_WORDS = 4
 
-        val QUESTION = Regex("""^(?:que|como|cuanto|cuanta|cuando|por que|what|how|when|why)\b""")
+        val QUESTION = Regex(
+            """^(?:que|como|cuanto|cuanta|cuantas|cuantos|cuando|por que|cual|cuales|donde|tengo|tienes|hay|habia|""" +
+                """si|dime si|sabes si|what|how|when|why|which|where|is|are|was|were|do|does|did|have|has|can i|if)\b""",
+        )
+        val UNDO = Regex(
+            // "Para" stops something only as the first word: "una alarma para ver las noticias".
+            """^(?:para|pausa)\b|""" +
+                """\b(?:quita(?:me)?|borra(?:me)?|apaga(?:me)?|cancela(?:me)?|elimina(?:me)?|deten|desactiva|""" +
+                """quitar|borrar|apagar|cancelar|eliminar|parar|pausar|desactivar|no suena|no ha sonado|""" +
+                """cancel|delete|remove|stop|pause|turn off|switch off|dismiss|snooze|disable|didn't|did not|doesn't|won't)\b""",
+        )
+        val NOT_A_PLACE = Regex(
+            """^(?:ser|estar|tener|hacer|dormir|fin de mes|final de mes|la luna|un acuerdo|una conclusion|""" +
+                """be|sleep|the next|next|the moon|the end)\b|\b(?:nivel|level|cancion|song|capitulo|chapter|pantalla|screen)\b""",
+        )
+        val NOT_A_NAME = setOf(
+            "me", "mi", "te", "nos", "le", "les", "la", "lo", "el", "atencion", "him", "her", "them", "us", "it", "you",
+            "a", "an", "the", "my", "someone", "alguien",
+        )
         val TIMER_WORD = Regex("""\b(?:temporizador|timer|cuenta atras|countdown)\b""")
         val REMIND_IN = Regex("""^(?:avisame|avisa|despiertame|wake me(?: up)?) (?:en|dentro de|in) \S""")
         val ALARM_WORD = Regex("""\b(?:alarma|alarm|despiertame|despiertanos|wake me)\b""")
@@ -234,11 +275,18 @@ class CommandRouter {
                 """(?: en internet| en la web| en google| on the web| online)? (.+?)""" +
                 """(?: en internet| en la web| en google| on the web| online)?$""",
         )
+        // A word for "now" alone is not enough - "la última letra del abecedario" does not change -
+        // so it has to come with something that does.
         val RECENT_QUESTION = Regex(
             """^(?:quien|que|cual|cuales|cuanto|cuanta|cuantos|cuantas|como (?:va|van|quedo|quedaron|esta|estan)|donde|""" +
                 """who|what|which|how much|how many|where)\b.*""" +
                 """\b(?:ultim[oa]s?|actual|actuales|actualmente|ahora mismo|hoy|esta semana|este ano|este mes|reciente|""" +
-                """recientes|recientemente|latest|last|current|currently|today|right now|this week|this year|this month)\b""",
+                """recientes|recientemente|latest|last|current|currently|today|right now|this week|this year|this month)\b.*""" +
+                """\b(?:partido|carrera|gran premio|resultado|resultados|clasificacion|liga|mundial|campeon|campeonato|""" +
+                """elecciones|presidente|presidenta|ministro|gobierno|papa|precio|precios|cotizacion|bolsa|euribor|bitcoin|""" +
+                """noticia|noticias|version|actualizacion|episodio|capitulo|temporada|estreno|album|disco|terremoto|huelga|""" +
+                """match|game|race|grand prix|result|results|standings|league|champion|election|president|prime minister|""" +
+                """pope|price|prices|stock|news|version|update|episode|season|release|album|earthquake|strike)\b""",
         )
         val YOUTUBE = Regex(
             """^(?:(?:abre|open) youtube (?:y|and) )?(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|""" +
@@ -248,7 +296,8 @@ class CommandRouter {
             """\b(?:noticias|titulares|news|headlines|pronostico|forecast|weather)\b|""" +
                 """\bque tiempo (?:hace|hara|va a hacer|va a ser|hay|tendremos|nos espera)\b|""" +
                 """\b(?:el )?tiempo (?:de |para |que hara )?(?:hoy|manana|esta semana|este fin de semana)\b|""" +
-                """\b(?:va a|will it) (?:llover|nevar|rain|snow)\b|\b(?:temperatura|temperature)\b""",
+                """\b(?:va a|will it) (?:llover|nevar|rain|snow)\b|""" +
+                """\b(?:temperatura|temperature) (?:en|de|hoy|manana|fuera|ahora|in|today|tomorrow|outside|now)\b""",
         )
         val MESSAGES = listOf(
             Regex(
@@ -262,12 +311,17 @@ class CommandRouter {
             ),
             Regex("""^(?:text|message|tell) (.+?) (?:saying that |saying |that )(.+)$"""),
         )
-        val CALL = Regex("""^(?:llama|llamar|telefonea|haz una llamada|call|phone|ring|dial) (?:a la |a |al |to )?(.+)$""")
+        // Spanish needs the "a": "llama la atención" is not a call.
+        val CALL = Regex(
+            """^(?:(?:llama(?:me)?|llamar|telefonea|haz una llamada) (?:a la |a |al )|(?:call|phone|dial) (?:to )?)(.+)$""",
+        )
         val OPEN_APP = Regex(
             """^(?:abre(?:me)?|abrir|lanza|ejecuta|inicia|open|launch|start|run) """ +
                 """(?:(?:la app|la aplicacion|the app|el|la|los|las|the) )*(.+?)(?: app)?$""",
         )
-        val TIME_QUESTION = Regex("""^(?:que hora (?:es|tenemos)|dime la hora|what time is it|what's the time|what is the time)$""")
+        val TIME_QUESTION = Regex(
+            """^(?:que hora (?:es|tenemos)|dime la hora|what time is it|what's the time|what is the time)(?: ahora(?: mismo)?| now| right now)?$""",
+        )
         val DATE_QUESTION = Regex(
             """^(?:que dia es(?: hoy)?|a que (?:dia )?estamos(?: hoy)?|que fecha es(?: hoy)?|""" +
                 """what day is it(?: today)?|what's the date(?: today)?|what is the date(?: today)?|what's today's date)$""",
