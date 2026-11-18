@@ -38,13 +38,13 @@ class AssistantService : VoiceInteractionService() {
          * Opens the assistant panel, optionally on a saved conversation. Returns false when this
          * app is not the phone's assistant, so the caller can explain why nothing happened.
          */
-        fun open(conversationId: Long? = null, wakeWord: Boolean = false): Boolean {
+        fun open(conversationId: Long? = null, wakeWord: Boolean = false, flags: Int = 0): Boolean {
             val service = current?.get() ?: return false
             val args = Bundle().apply {
                 conversationId?.let { putLong(EXTRA_CONVERSATION_ID, it) }
                 putBoolean(EXTRA_WAKE_WORD, wakeWord)
             }
-            service.showSession(args, 0)
+            service.showSession(args, flags)
             return true
         }
     }
