@@ -351,11 +351,20 @@ Java_dev_localassistant_llm_LlamaCppEngine_nativeGenerate(JNIEnv *env, jclass, j
     }
     common_sampler_free(sampler);
 
+    // The reply's words only reach the system log in debug builds; the log outlives the history.
+#ifndef NDEBUG
     LOGI("Raw reply (%d tokens, %lldms parsing): |%s|", generated, parseUs / 1000, raw.substr(0, 100).c_str());
+#else
+    LOGI("Raw reply (%d tokens, %lldms parsing)", generated, parseUs / 1000);
+#endif
     if (status == kOk) {
         try {
             const common_chat_msg reply = common_chat_parse(common_chat_input(raw), /*is_partial=*/false, parserParams);
+#ifndef NDEBUG
             LOGI("Parsed: %zu tool calls, content '%s'", reply.tool_calls.size(), reply.content.substr(0, 60).c_str());
+#else
+            LOGI("Parsed: %zu tool calls, %zu bytes of content", reply.tool_calls.size(), reply.content.size());
+#endif
             // Text only goes out every few tokens, so the words after the last of those rounds
             // are still unsent here; without this every reply lost its ending.
             if (keepGoing && reply.content.size() > streamed.size()) {
