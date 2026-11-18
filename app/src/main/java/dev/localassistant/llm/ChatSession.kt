@@ -6,6 +6,7 @@ import dev.localassistant.commands.Command
 import dev.localassistant.commands.CommandRouter
 import dev.localassistant.commands.SpokenText
 import dev.localassistant.history.ConversationStore
+import dev.localassistant.loggable
 import dev.localassistant.tools.AssistantTool
 import dev.localassistant.tools.RESOLVED
 import dev.localassistant.tools.ToolRegistry
@@ -171,7 +172,7 @@ class ChatSession(
                 val result = withContext(Dispatchers.IO) {
                     runCatching { JSONObject(tool.run(JSONObject(command.arguments))) }.getOrNull()
                 }
-                Log.i(TAG, "Command ${command.tool} -> ${result.toString().take(120)}")
+                Log.i(TAG, "Command ${command.tool} -> ${loggable(result.toString().take(120))}")
                 if (result == null || result.has("error")) return false
                 val resolved = result.optString(RESOLVED)
                 if (command.subject != null && resolved.isNotEmpty()) {
@@ -346,7 +347,7 @@ class ChatSession(
                         JSONObject().put("error", error.message ?: "tool failed").toString()
                     }
                 } ?: JSONObject().put("error", "unknown tool").toString()
-                Log.i(TAG, "Tool ${call.name} -> ${output.take(120)}")
+                Log.i(TAG, "Tool ${call.name} -> ${loggable(output.take(120))}")
                 ChatMessage(Role.TOOL, output, toolName = call.name)
             }
             conversation = conversation + ChatMessage(Role.ASSISTANT, replyText, toolCalls = requested) + results
