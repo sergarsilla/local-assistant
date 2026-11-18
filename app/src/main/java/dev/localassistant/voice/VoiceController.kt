@@ -252,10 +252,10 @@ class VoiceController(
     private fun spokenReplyListener(): ReplyListener? {
         val prefs = settings.state.value
         if (!prefs.speakReplies || !speaker.canSpeak(prefs.language)) return null
-        speaker.begin(prefs.language)
+        val reply = speaker.begin(prefs.language)
         return object : ReplyListener {
-            override fun onChunk(text: String) = speaker.append(text)
-            override fun onEnd() = speaker.finish()
+            override fun onChunk(text: String) = speaker.append(text, reply)
+            override fun onEnd() = speaker.finish(reply)
         }
     }
 

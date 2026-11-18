@@ -70,19 +70,27 @@ class Speaker(
         installedVoice(language)?.let(voices::preload)
     }
 
-    /** Starts a new spoken reply, interrupting any previous one. */
+    /** Which reply [append] and [finish] are speaking for; earlier ones are ignored. */
+    private var current = 0
+
+    /**
+     * Starts a new spoken reply, interrupting any previous one, and returns its number. The
+     * previous reply ends after this one has begun, and its end used to close the new reply's
+     * queue, so the answer was never heard.
+     */
     @Synchronized
-    fun begin(language: String) {
+    fun begin(language: String): Int {
         stop()
+        val reply = ++current
         spokenSoFar = ""
-        if (!canSpeak(language)) return
+        if (!canSpeak(language)) return reply
         val queue = Channel<String>(Channel.UNLIMITED).also { sentences = it }
         val audio = Channel<FloatArray>(capacity = 2)
         _speaking.value = true
         // Quietens the music before the first sample, not after it.
         focus.hold()
         var held = true
-        val reply = scope.launch(Dispatchers.Default) {
+        val speech = scope.launch(Dispatchers.Default) {
             val first = queue.receiveCatching().getOrNull() ?: return@launch
             val pack = LanguageGuess.of(first)?.let(::installedVoice)
                 ?: installedVoice(language)
@@ -101,22 +109,23 @@ class Speaker(
             }
             player.join()
         }
-        job = reply
+        job = speech
         // A cancelled earlier reply may finish after this one started; only the current one clears the flag.
-        reply.invokeOnCompletion {
+        speech.invokeOnCompletion {
             synchronized(this) {
-                if (job === reply || job == null) _speaking.value = false
+                if (job === speech || job == null) _speaking.value = false
                 if (held) {
                     held = false
                     focus.release()
                 }
             }
         }
+        return reply
     }
 
     @Synchronized
-    fun append(text: String) {
-        if (job == null) return
+    fun append(text: String, reply: Int = current) {
+        if (job == null || reply != current) return
         pending.append(text)
         while (true) {
             val end = SENTENCE_END.find(pending) ?: break
@@ -127,7 +136,8 @@ class Speaker(
     }
 
     @Synchronized
-    fun finish() {
+    fun finish(reply: Int = current) {
+        if (reply != current) return
         enqueue(pending.toString())
         pending.clear()
         sentences.close()
