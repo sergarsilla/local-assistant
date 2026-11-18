@@ -195,7 +195,8 @@ private fun WakeWordCard(state: SettingsUiState, actions: SettingsActions) {
             checked = state.wakeWord.enabled && available,
             onCheckedChange = actions::setWakeWord,
             icon = AssistantIcons.GraphicEq,
-            enabled = available,
+            // A setting left on must still be switchable off when it cannot run.
+            enabled = available || state.wakeWord.enabled,
         )
         if (state.wakeWord.enabled && available) {
             WakePhrase.entries.forEach { phrase ->

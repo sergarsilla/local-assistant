@@ -1,6 +1,7 @@
 package dev.localassistant.wake
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
@@ -125,8 +126,11 @@ class WakeWordService : Service() {
         fun syncWithSettings(context: Context) {
             val enabled = AssistantRuntime.wakeWord.state.value.enabled
             val mic = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            // Only the assistant can open the panel the phrase is for; without the role the
+            // microphone stayed on for nothing, behind a switch that showed off.
+            val assistant = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
             val intent = Intent(context, WakeWordService::class.java)
-            if (!enabled || !mic) {
+            if (!enabled || !mic || !assistant) {
                 context.stopService(intent)
                 return
             }
