@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import dev.localassistant.AssistantRuntime
@@ -50,9 +51,12 @@ fun PanelRoute(
     val screenAvailable = screenText != null || screenImage != null
     val suggestions = suggestions(screenAvailable, webSearch)
     val context = LocalContext.current
+    val screenPrompt by rememberUpdatedState(stringResource(R.string.suggest_screen_prompt))
     val actions = remember(chat, voice, screen) {
         object : PanelActions {
             override fun send(text: String) {
+                // Tapping "Summarise the screen" is itself the permission to look at it.
+                if (text == screenPrompt) screen.setAttach(true)
                 // In conversation mode a typed question is answered out loud too.
                 if (voice.conversation.value) voice.ask(text) else chat.send(text)
             }
@@ -67,6 +71,7 @@ fun PanelRoute(
             override fun newConversation() {
                 voice.speaker.stop()
                 chat.clear()
+                runtime.tools.actions.clear()
             }
 
             override fun confirmAction() = runtime.tools.confirmPendingAction()
