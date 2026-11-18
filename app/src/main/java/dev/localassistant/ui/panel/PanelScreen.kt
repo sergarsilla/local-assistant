@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -98,11 +100,14 @@ fun PanelScreen(state: PanelUiState, actions: PanelActions, startTyping: Boolean
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.32f))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = actions::dismiss),
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = actions::dismiss)
+            .statusBarsPadding(),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Surface(
             modifier = Modifier
+                // A sheet the width of a tablet puts the conversation out of a thumb's reach.
+                .widthIn(max = MAX_SHEET_WIDTH)
                 .fillMaxWidth()
                 .imePadding()
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
@@ -124,7 +129,9 @@ fun PanelScreen(state: PanelUiState, actions: PanelActions, startTyping: Boolean
                 if (state.isEmpty) {
                     Greeting(state.suggestions, onSuggestion = actions::send)
                 } else {
-                    Conversation(state, actions)
+                    // The conversation gives way first when the keyboard leaves little room, so the
+                    // composer being typed into never ends up off screen.
+                    Conversation(state, actions, Modifier.weight(1f, fill = false))
                 }
                 state.pendingAction?.let { PendingActionCard(it, actions) }
                 ErrorCard(state.error, onOpenModels = actions::openModels)
@@ -215,7 +222,7 @@ private fun Greeting(suggestions: List<Suggestion>, onSuggestion: (String) -> Un
 }
 
 @Composable
-private fun Conversation(state: PanelUiState, actions: PanelActions) {
+private fun Conversation(state: PanelUiState, actions: PanelActions, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     val last = state.messages.lastOrNull()
     // Follows the reply as it grows, including every new chunk of the last message.
@@ -227,7 +234,7 @@ private fun Conversation(state: PanelUiState, actions: PanelActions) {
         state = listState,
         copyLabel = stringResource(R.string.panel_copy),
         onCopy = actions::copy,
-        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+        modifier = modifier.fillMaxWidth().heightIn(max = 400.dp),
         copyLastOnly = true,
     )
 }
@@ -448,7 +455,11 @@ private fun Composer(state: PanelUiState, actions: PanelActions, startTyping: Bo
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 FilledTonalIconButton(
-                    onClick = { typing = true },
+                    onClick = {
+                        // Left on, the microphone sent whatever it heard while the user typed.
+                        if (listening != null) actions.toggleListening()
+                        typing = true
+                    },
                     modifier = Modifier.align(Alignment.CenterStart).size(LargeTouch),
                 ) {
                     Icon(AssistantIcons.Keyboard, contentDescription = stringResource(R.string.panel_type))
@@ -528,3 +539,5 @@ private fun VoiceHaptics(mode: VoiceMode) {
 private val ChipHeight = 48.dp
 private val OrbSize = 136.dp
 private val CompactOrbSize = 72.dp
+
+private val MAX_SHEET_WIDTH = 640.dp
