@@ -37,7 +37,7 @@ class CommandRouter {
         val said = Said.of(utterance) ?: return null
         // Actions before searches: "dile a Ana que tengo noticias" is a message, not the news.
         return showOnMap(said, spanish)
-            ?: youtube(said, spanish)
+            ?: siteSearch(said, spanish)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
             ?: navigate(said, spanish)
@@ -117,13 +117,15 @@ class CommandRouter {
         )
     }
 
-    private fun youtube(said: Said, spanish: Boolean): Command? {
-        val match = YOUTUBE.find(said.folded) ?: return null
+    private fun siteSearch(said: Said, spanish: Boolean): Command? {
+        val match = SITE_SEARCH.find(said.folded) ?: return null
         val query = said.original(match.groups[1]!!.range)
+        val site = match.groups[2]!!.value
+        val shown = SITE_NAMES.getValue(site)
         return Command.Action(
-            "search_youtube",
-            mapOf("query" to query),
-            if (spanish) "Buscando $query en YouTube." else "Searching YouTube for $query.",
+            "search_site",
+            mapOf("site" to site, "query" to query),
+            if (spanish) "Buscando $query en $shown." else "Searching $shown for $query.",
         )
     }
 
@@ -288,9 +290,12 @@ class CommandRouter {
                 """match|game|race|grand prix|result|results|standings|league|champion|election|president|prime minister|""" +
                 """pope|price|prices|stock|news|version|update|episode|season|release|album|earthquake|strike)\b""",
         )
-        val YOUTUBE = Regex(
-            """^(?:(?:abre|open) youtube (?:y|and) )?(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|""" +
-                """search(?: for)?|find|look up|play|show me) (?:(?:un |el |a |the )?videos? (?:de |sobre |of |about )?)?(.+?) (?:en|on) youtube$""",
+        val SITE_NAMES = mapOf("youtube" to "YouTube", "amazon" to "Amazon", "aliexpress" to "AliExpress", "wikipedia" to "Wikipedia")
+        val SITE_SEARCH = Regex(
+            """^(?:(?:abre|abreme|open) (?:youtube|amazon|aliexpress|wikipedia) (?:y|and) )?""" +
+                """(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|encuentrame|""" +
+                """search(?: for)?|find|look up|play|show me) (?:(?:un |el |a |the )?videos? (?:de |sobre |of |about )?)?""" +
+                """(.+?) (?:en|on|in) (youtube|amazon|aliexpress|wikipedia)$""",
         )
         val CURRENT_AFFAIRS = Regex(
             """\b(?:noticias|titulares|news|headlines|pronostico|forecast|weather)\b|""" +

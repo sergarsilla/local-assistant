@@ -281,4 +281,6 @@
     <string name="settings_permissions_manage">Manage in system settings</string>
     <string name="settings_permissions_manage_note">Revoke a permission, or allow one you denied before.</string>
     <string name="catalog_note_qwen35_4b">The sharpest answers measured here, at a third of the speed: about 5 tokens a second, and over a minute to load the first time.</string>
+    <string name="panel_tool_site_search">Searching %1$s</string>
+    <string name="panel_tool_open_link">Opening %1$s</string>
 </resources>

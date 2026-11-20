@@ -281,4 +281,6 @@
     <string name="settings_permissions_manage">Gestionar en los ajustes del sistema</string>
     <string name="settings_permissions_manage_note">Quita un permiso, o concede uno que denegaste antes.</string>
     <string name="catalog_note_qwen35_4b">Las respuestas más finas de las medidas aquí, a un tercio de la velocidad: unos 5 tokens por segundo y más de un minuto en cargar la primera vez.</string>
+    <string name="panel_tool_site_search">Buscando en %1$s</string>
+    <string name="panel_tool_open_link">Abriendo %1$s</string>
 </resources>

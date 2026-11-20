@@ -222,10 +222,13 @@ class ChatSession(
         appendLine("<<<")
         for (i in 0 until results.length()) {
             val result = results.getJSONObject(i)
-            appendLine("${i + 1}. ${result.optString("title")}: ${result.optString("snippet")}")
+            appendLine("${i + 1}. ${result.optString("title")} (${result.optString("url")}): ${result.optString("snippet")}")
         }
         appendLine(">>>")
-        append("Answer from these results, in one or two sentences: ")
+        // Asked to "give me the links" the model used to describe what it had found instead of
+        // opening any of it; it can only offer what it is told the addresses are.
+        append("Answer from these results, in one or two sentences, and say which site it comes from. ")
+        append("If the user wants to see or open one, call open_link with its address. ")
         append(question)
     }
 

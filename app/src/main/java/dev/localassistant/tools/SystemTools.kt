@@ -387,24 +387,80 @@ class MapsTool(
     }
 }
 
-/** A link rather than an app, so whichever YouTube client the phone has, or its browser, takes it. */
-class YouTubeTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
-    override val name = "search_youtube"
+/**
+ * Shows search results inside a site's app, or in the browser when it has none. A link rather
+ * than an app is what is opened, so whichever client the phone has for that site takes it.
+ */
+class SiteSearchTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
+    override val name = "search_site"
 
     override fun describe() = """
-        {"name":"search_youtube",
-         "description":"Search YouTube for videos and show the results.",
+        {"name":"search_site",
+         "description":"Show search results on a site, in its app if installed. Use web for anything else.",
          "parameters":{"type":"object","properties":{
+           "site":{"type":"string","enum":["youtube","amazon","aliexpress","wikipedia","web"]},
            "query":{"type":"string"}},
-          "required":["query"]}}
+          "required":["site","query"]}}
     """.trimIndent()
 
     override fun run(arguments: JSONObject): String {
         val query = arguments.optString("query").ifBlank { return error("missing query") }
-        listener.onToolStarted(name, query)
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=${Uri.encode(query)}"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return start(launcher, intent, "showing YouTube results for $query")
+        val site = arguments.optString("site").ifBlank { "web" }
+        val url = SiteSearch.url(site, query, java.util.Locale.getDefault()) ?: return error("unknown site '$site'")
+        listener.onToolStarted(name, "$site: $query")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return start(launcher, intent, "showing $site results for $query")
+    }
+}
+
+/** Search result pages per site, kept free of Android types so they can be tested. */
+object SiteSearch {
+    fun url(site: String, query: String, locale: java.util.Locale): String? {
+        val q = java.net.URLEncoder.encode(query, "UTF-8")
+        return when (site.lowercase()) {
+            "youtube" -> "https://www.youtube.com/results?search_query=$q"
+            "amazon" -> "https://www.${amazonDomain(locale.country)}/s?k=$q"
+            "aliexpress" -> "https://www.aliexpress.com/wholesale?SearchText=$q"
+            "wikipedia" -> "https://${locale.language.ifBlank { "en" }}.wikipedia.org/w/index.php?search=$q"
+            "web" -> "https://duckduckgo.com/?q=$q"
+            else -> null
+        }
+    }
+
+    /** The user's own store: amazon.com prices and stock do not apply in Spain. */
+    private fun amazonDomain(country: String) = when (country.uppercase()) {
+        "ES" -> "amazon.es"
+        "GB", "UK" -> "amazon.co.uk"
+        "DE", "AT" -> "amazon.de"
+        "FR", "BE" -> "amazon.fr"
+        "IT" -> "amazon.it"
+        "NL" -> "amazon.nl"
+        "MX" -> "amazon.com.mx"
+        else -> "amazon.com"
+    }
+}
+
+/**
+ * Opens a web address, usually one a search returned. Only https: the model passing on a link
+ * is the one case where an address comes from outside the user's own words.
+ */
+class OpenLinkTool(private val launcher: ActivityLauncher, private val listener: ToolActivityListener) : AssistantTool {
+    override val name = "open_link"
+
+    override fun describe() = """
+        {"name":"open_link",
+         "description":"Open a web page, such as one found by web_search, in its app or the browser.",
+         "parameters":{"type":"object","properties":{
+           "url":{"type":"string","description":"https address"}},
+          "required":["url"]}}
+    """.trimIndent()
+
+    override fun run(arguments: JSONObject): String {
+        val url = arguments.optString("url").trim()
+        val uri = Uri.parse(url)
+        if (uri.scheme != "https" || uri.host.isNullOrBlank()) return error("only https addresses can be opened")
+        listener.onToolStarted(name, uri.host!!)
+        return start(launcher, Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${uri.host}")
     }
 }
 

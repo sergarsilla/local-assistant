@@ -251,6 +251,8 @@ private fun toolLabel(activity: ToolActivity): String {
         "create_calendar_event" -> R.string.panel_tool_calendar
         "send_message" -> R.string.panel_tool_message
         "call_contact" -> R.string.panel_tool_call
+        "search_site" -> R.string.panel_tool_site_search
+        "open_link" -> R.string.panel_tool_open_link
         else -> return activity.name
     }
     return stringResource(res, activity.summary)

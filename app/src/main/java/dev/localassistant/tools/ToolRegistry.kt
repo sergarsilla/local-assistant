@@ -54,7 +54,8 @@ class ToolRegistry(private val context: Context, apps: AppPreferences) {
         CalendarTool(actions, listener),
         SendMessageTool(actions, contacts, apps, installed, listener),
         CallTool(launcher, contacts, listener),
-        YouTubeTool(launcher, listener),
+        SiteSearchTool(launcher, listener),
+        OpenLinkTool(launcher, listener),
     )
     private val online = listOf(WebSearchTool(listener), ReadPageTool(listener))
 
