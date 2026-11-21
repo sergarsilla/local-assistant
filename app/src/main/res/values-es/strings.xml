@@ -189,7 +189,7 @@
     <string name="settings_recognition">Reconocimiento de voz</string>
     <string name="voice_voices_es">Voces en español</string>
     <string name="voice_voices_en">Voces en inglés</string>
-    <string name="voice_pack_stt_canary">Canary 180M · ligero; hay que indicarle el idioma</string>
+    <string name="voice_pack_stt_canary">Canary 180M · ligero; descargado junto a Parakeet, corrige solo las frases en español que Parakeet escribe en inglés</string>
     <string name="voice_pack_stt_parakeet">Parakeet 0.6B · más preciso, detecta el idioma</string>
     <string name="voice_pack_es_davefx">Piper davefx · España, hombre</string>
     <string name="voice_pack_es_miro">Piper miro · España, hombre, alta calidad</string>

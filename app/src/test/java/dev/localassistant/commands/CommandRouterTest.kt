@@ -2,6 +2,7 @@ package dev.localassistant.commands
 
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -203,6 +204,21 @@ class CommandRouterTest {
         assertEquals(Command.Read("Reloj"), es("¿Qué pone en la app del Reloj?"))
         assertNull(es("Lee esto"))
         assertEquals("open_app", action(es("Abre WhatsApp")).tool)
+        assertEquals(Command.Read("Settings"), en("Read the Settings app and tell me how much space is free"))
+    }
+
+    @Test
+    fun `plain steps in the app on screen skip the model`() {
+        val tap = action(es("Toca Batería"))
+        assertEquals("use_app", tap.tool)
+        assertEquals(mapOf("action" to "tap", "target" to "Batería"), tap.arguments)
+        assertEquals("Wi-Fi", action(es("pulsa en el botón de Wi-Fi")).arguments["target"])
+        assertEquals("Battery", action(en("tap on Battery")).arguments["target"])
+        assertEquals(mapOf("action" to "back"), action(es("vuelve atrás")).arguments)
+        assertEquals(mapOf("action" to "scroll_down"), action(es("baja un poco")).arguments)
+        assertEquals(mapOf("action" to "scroll_up"), action(en("scroll up")).arguments)
+        assertNotEquals("use_app", (es("baja el volumen") as? Command.Action)?.tool)
+        assertNull(es("toca una canción que me guste mucho de los años ochenta"))
     }
 
     @Test
