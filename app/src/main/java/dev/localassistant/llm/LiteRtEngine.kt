@@ -23,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
@@ -33,6 +34,7 @@ class LiteRtEngine private constructor(
     private val engine: Engine,
     override val backendName: String,
     override val supportsImages: Boolean,
+    private val contextSize: Int,
 ) : LlmEngine {
 
     override val supportsTools = true
@@ -50,6 +52,9 @@ class LiteRtEngine private constructor(
             Log.i(TAG, "Prepared the preface in ${SystemClock.elapsedRealtime() - started}ms")
         }
     }
+
+    override fun contextFill(): Float? =
+        conversation?.let { runCatching { it.getTokenCount().toFloat() / contextSize }.getOrNull() }
 
     override fun generate(
         messages: List<ChatMessage>,
@@ -123,6 +128,11 @@ class LiteRtEngine private constructor(
                 ),
             ),
         )
+    }.catch { e ->
+        // LiteRT-LM reports a full context window as a generic error, only told apart by its text.
+        if (!isContextOverflow(e.message)) throw e
+        Log.w(TAG, "Context window full: ${e.message}")
+        throw ContextOverflowException()
     }.flowOn(Dispatchers.IO)
 
     private fun userMessage(message: ChatMessage): Message {
@@ -179,6 +189,22 @@ class LiteRtEngine private constructor(
         private const val TAG = "LiteRtEngine"
         private const val CANCEL_WAIT_MS = 3_000L
 
+        private val OVERFLOW_MESSAGES = listOf(
+            "input token ids are too long",
+            "max number of tokens reached",
+            "maximum number of tokens",
+            "maximum kv-cache size reached",
+            "maximum cache length",
+            "exceeds max sequence length",
+            "exceeds available state entries",
+            "maxnumtokensreached",
+        )
+
+        internal fun isContextOverflow(message: String?): Boolean {
+            val text = message?.lowercase() ?: return false
+            return OVERFLOW_MESSAGES.any { it in text }
+        }
+
         /**
          * Loads on [backend]; the caller decides what to fall back to when that fails. A
          * [visionBackend] also loads the image encoder, which only multimodal models have.
@@ -200,7 +226,7 @@ class LiteRtEngine private constructor(
                 runCatching { engine.close() }
                 throw e
             }
-            return LiteRtEngine(engine, backend.name, supportsImages = visionBackend != null)
+            return LiteRtEngine(engine, backend.name, supportsImages = visionBackend != null, contextSize = contextSize)
         }
     }
 }

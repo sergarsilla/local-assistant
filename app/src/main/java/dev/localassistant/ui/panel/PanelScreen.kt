@@ -76,6 +76,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.localassistant.R
 import dev.localassistant.llm.ChatError
+import dev.localassistant.llm.ContextState
 import dev.localassistant.llm.EngineState
 import dev.localassistant.tools.ActionKind
 import dev.localassistant.tools.PendingAction
@@ -137,6 +138,9 @@ fun PanelScreen(state: PanelUiState, actions: PanelActions, startTyping: Boolean
                 }
                 state.pendingAction?.let { PendingActionCard(it, actions) }
                 ErrorCard(state.error, onOpenModels = actions::openModels)
+                if (state.error == null && !state.generating && state.context.nearlyFull) {
+                    ContextCard(state.context, onNewConversation = actions::newConversation)
+                }
                 VoiceSetupCard(state.voice, onOpenSettings = actions::openVoiceSettings)
                 PanelToggles(state, actions)
                 Composer(state, actions, startTyping)
@@ -312,12 +316,33 @@ private fun ErrorCard(error: ChatError?, onOpenModels: () -> Unit) {
             Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             val text = when (error) {
                 ChatError.NoModel -> stringResource(R.string.panel_no_model)
+                ChatError.TooLong -> stringResource(R.string.panel_context_too_long)
                 is ChatError.Failure -> stringResource(R.string.panel_error, error.message)
             }
             Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
             if (error == ChatError.NoModel) {
                 FilledTonalButton(onClick = onOpenModels) { Text(stringResource(R.string.panel_open_models)) }
             }
+        }
+    }
+}
+
+/** Says the conversation is filling up before the model starts forgetting its beginning. */
+@Composable
+private fun ContextCard(context: ContextState, onNewConversation: () -> Unit) {
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(Spacing.l),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
+        ) {
+            Text(
+                stringResource(if (context.forgotten) R.string.panel_context_forgotten else R.string.panel_context_full),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            FilledTonalButton(onClick = onNewConversation) { Text(stringResource(R.string.panel_context_new)) }
         }
     }
 }

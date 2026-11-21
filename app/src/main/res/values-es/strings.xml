@@ -64,6 +64,10 @@
     <string name="panel_no_model">Aún no hay ningún modelo instalado.</string>
     <string name="panel_open_models">Elegir un modelo</string>
     <string name="panel_error">Algo ha fallado: %1$s</string>
+    <string name="panel_context_full">La conversación se está haciendo larga. Empieza una nueva para que siga respondiendo rápido y bien.</string>
+    <string name="panel_context_forgotten">Ya no recuerdo el principio de esta conversación. Empieza una nueva si cambias de tema.</string>
+    <string name="panel_context_new">Nuevo chat</string>
+    <string name="panel_context_too_long">Ese mensaje es demasiado largo para el modelo. Prueba con uno más corto.</string>
     <string name="panel_tool_web_search">Buscando en internet: %1$s</string>
     <string name="panel_tool_read_web_page">Leyendo %1$s</string>
     <string name="panel_tool_timer">Poniendo un temporizador: %1$s</string>

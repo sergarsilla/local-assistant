@@ -15,9 +15,17 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /** GGUF models through llama.cpp on the CPU. */
-class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
+class LlamaCppEngine private constructor(
+    private var handle: Long,
+    private val contextSize: Int,
+) : LlmEngine {
 
     override val supportsTools = true
+
+    @Volatile
+    private var usedTokens = 0
+
+    override fun contextFill() = usedTokens.toFloat() / contextSize
 
     /**
      * Decodes the system prompt and tool definitions into the KV cache. The chat is rendered with a
@@ -73,16 +81,19 @@ class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
             stats,
         )
         when (status) {
-            STATUS_OK, STATUS_TOOL_CALLS -> send(
-                GenerationEvent.Finished(
-                    GenerationStats(
-                        promptTokens = stats[0].toInt(),
-                        prefillMillis = stats[2],
-                        generatedTokens = stats[3].toInt(),
-                        generateMillis = stats[4],
+            STATUS_OK, STATUS_TOOL_CALLS -> {
+                usedTokens = (stats[0] + stats[3]).toInt()
+                send(
+                    GenerationEvent.Finished(
+                        GenerationStats(
+                            promptTokens = stats[0].toInt(),
+                            prefillMillis = stats[2],
+                            generatedTokens = stats[3].toInt(),
+                            generateMillis = stats[4],
+                        ),
                     ),
-                ),
-            )
+                )
+            }
             STATUS_CONTEXT_OVERFLOW -> throw ContextOverflowException()
             else -> error("llama.cpp generation failed with status $status")
         }
@@ -156,7 +167,7 @@ class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
         fun load(model: File, contextSize: Int, threads: Int, prefaceState: File? = null): LlamaCppEngine {
             val handle = nativeLoad(model.path, contextSize, threads, prefaceState?.path.orEmpty())
             require(handle != 0L) { "llama.cpp could not load ${model.name}" }
-            return LlamaCppEngine(handle)
+            return LlamaCppEngine(handle, contextSize)
         }
 
         @JvmStatic private external fun nativeLoad(path: String, contextSize: Int, threads: Int, statePath: String): Long
@@ -172,5 +183,3 @@ class LlamaCppEngine private constructor(private var handle: Long) : LlmEngine {
         ): Int
     }
 }
-
-class ContextOverflowException : IllegalStateException("Conversation does not fit in the context window")
