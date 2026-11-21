@@ -107,7 +107,11 @@ class CommandRouterTest {
         assertEquals("Signal", action(en("open the Signal app")).arguments["name"])
         assertEquals("Telegram", action(es("Abre Telegram.")).arguments["name"])
         val video = action(es("Búscame cómo hacer hula hoop en YouTube"))
-        assertEquals("search_youtube", video.tool)
+        assertEquals("search_site", video.tool)
+        assertEquals("youtube", video.arguments["site"])
+        val shop = action(es("Búscame fundas para el Pixel 10 en Amazon"))
+        assertEquals("amazon", shop.arguments["site"])
+        assertEquals("fundas para el Pixel 10", shop.arguments["query"])
         assertEquals("cómo hacer hula hoop", video.arguments["query"])
         assertEquals("lofi", action(en("play lofi on YouTube")).arguments["query"])
         assertNull(es("Ábreme YouTube y dime qué tengo en el feed principal"))
@@ -186,6 +190,19 @@ class CommandRouterTest {
             assertTrue("$text -> $command", command == null)
         }
         assertEquals("It's 9:30.", answer(en("What time is it right now?")))
+    }
+
+    @Test
+    fun `asking what an app shows reads it`() {
+        assertEquals(Command.Read("WhatsApp"), es("¿Qué me ha dicho mamá en WhatsApp?"))
+        assertEquals(Command.Read("Telegram"), es("Léeme los mensajes de Telegram"))
+        assertEquals(Command.Read("whatsapp"), es("qué tengo en whatsapp"))
+        assertEquals(Command.Read("Signal"), en("What's new on Signal?"))
+        assertNull(es("¿Qué es WhatsApp?"))
+        assertEquals(Command.Read("ajustes"), es("lee la app de ajustes y dime cuanto espacio libre tengo"))
+        assertEquals(Command.Read("Reloj"), es("¿Qué pone en la app del Reloj?"))
+        assertNull(es("Lee esto"))
+        assertEquals("open_app", action(es("Abre WhatsApp")).tool)
     }
 
     @Test

@@ -281,4 +281,12 @@
     <string name="settings_permissions_manage">Gestionar en los ajustes del sistema</string>
     <string name="settings_permissions_manage_note">Quita un permiso, o concede uno que denegaste antes.</string>
     <string name="catalog_note_qwen35_4b">Las respuestas más finas de las medidas aquí, a un tercio de la velocidad: unos 5 tokens por segundo y más de un minuto en cargar la primera vez.</string>
+    <string name="panel_tool_site_search">Buscando en %1$s</string>
+    <string name="panel_tool_open_link">Abriendo %1$s</string>
+    <string name="app_reader_name">Asistente local: leer apps</string>
+    <string name="app_reader_description">Permite al asistente leer el texto de una app cuando se lo pides, como tus últimos chats. No lee nada por su cuenta, no guarda nada y nada sale del móvil.</string>
+    <string name="panel_tool_read_app">Leyendo %1$s</string>
+    <string name="settings_read_apps">Leer otras apps</string>
+    <string name="settings_read_apps_on">Activado: el asistente puede leer una app cuando se lo pides, como tus últimos chats.</string>
+    <string name="settings_read_apps_off">Desactivado. Actívalo en la lista, en Apps descargadas. Si Android dice que es un ajuste restringido: Info de la app, menú ⋮, Permitir ajustes restringidos, y vuelve a probar.</string>
 </resources>

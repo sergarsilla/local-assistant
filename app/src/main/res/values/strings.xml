@@ -281,4 +281,12 @@
     <string name="settings_permissions_manage">Manage in system settings</string>
     <string name="settings_permissions_manage_note">Revoke a permission, or allow one you denied before.</string>
     <string name="catalog_note_qwen35_4b">The sharpest answers measured here, at a third of the speed: about 5 tokens a second, and over a minute to load the first time.</string>
+    <string name="panel_tool_site_search">Searching %1$s</string>
+    <string name="panel_tool_open_link">Opening %1$s</string>
+    <string name="app_reader_name">Local assistant: read apps</string>
+    <string name="app_reader_description">Lets the assistant read the text of an app when you ask it to, such as your latest chats. It reads nothing on its own, keeps nothing, and nothing leaves the phone.</string>
+    <string name="panel_tool_read_app">Reading %1$s</string>
+    <string name="settings_read_apps">Read other apps</string>
+    <string name="settings_read_apps_on">On: the assistant can read an app when you ask, such as your latest chats.</string>
+    <string name="settings_read_apps_off">Off. Turn it on in the list, under Downloaded apps. If Android says it is a restricted setting: App info, ⋮ menu, Allow restricted settings, then try again.</string>
 </resources>

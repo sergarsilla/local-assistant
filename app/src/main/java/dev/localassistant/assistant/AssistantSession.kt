@@ -49,6 +49,7 @@ class AssistantSession(context: Context) :
     private val savedStateController = SavedStateRegistryController.create(this)
     private val store = ViewModelStore()
     private var showRequestedAt = 0L
+    private var closedByUser = false
     private val mainHandler = Handler(Looper.getMainLooper())
     val screen = ScreenContext()
     private val chat = ChatSession(
@@ -85,7 +86,7 @@ class AssistantSession(context: Context) :
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AssistantSession))
             setContent {
                 AssistantTheme {
-                    PanelRoute(chat = chat, voice = voice, screen = screen, onDismiss = ::hide, onOpenApp = ::openApp)
+                    PanelRoute(chat = chat, voice = voice, screen = screen, onDismiss = ::close, onOpenApp = ::openApp)
                 }
             }
         }
@@ -107,6 +108,7 @@ class AssistantSession(context: Context) :
 
     override fun onShow(args: Bundle?, showFlags: Int) {
         showRequestedAt = SystemClock.elapsedRealtime()
+        closedByUser = false
         super.onShow(args, showFlags)
         args?.getLong(AssistantService.EXTRA_CONVERSATION_ID, NO_CONVERSATION)
             ?.takeIf { it != NO_CONVERSATION }
@@ -119,7 +121,8 @@ class AssistantSession(context: Context) :
         // Loading the model and the voices saturates every core for over a second. Started here
         // they compete with the panel's own first frames, so they wait until it is on screen:
         // the user is still reading it, and nothing they can do needs the model this soon.
-        val willListen = byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen
+        val returning = args?.getBoolean(AssistantService.EXTRA_RETURNING, false) == true
+        val willListen = !returning && (byWakeWord || AssistantRuntime.voiceSettings.state.value.listenOnOpen)
         afterFirstFrame {
             stopPanning()
             AssistantRuntime.engine.preload(chat::preface)
@@ -131,6 +134,7 @@ class AssistantSession(context: Context) :
             // Tools run on the model's thread; the session is only touched on the main one.
             if (leavesPanel) mainHandler.post { hide() }
         }
+        AssistantRuntime.tools.hidePanel = { mainHandler.post { hide() } }
         if (willListen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
@@ -140,6 +144,14 @@ class AssistantSession(context: Context) :
     override fun onHide() {
         super.onHide()
         AssistantRuntime.tools.activityStarter = null
+        AssistantRuntime.tools.hidePanel = null
+        if (!closedByUser && AssistantRuntime.tools.panelSteppedAside) {
+            // A tool moved the panel out of the way to read the app below; the turn goes on.
+            AssistantRuntime.tools.onPanelHiddenAside()
+            voice.stopListening()
+            lifecycleRegistry.currentState = Lifecycle.State.CREATED
+            return
+        }
         // A message left unconfirmed must not be waiting, armed, the next time the panel opens.
         AssistantRuntime.tools.actions.clear()
         screen.clear()
@@ -155,6 +167,16 @@ class AssistantSession(context: Context) :
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         store.clear()
         super.onDestroy()
+    }
+
+    override fun onBackPressed() {
+        closedByUser = true
+        super.onBackPressed()
+    }
+
+    private fun close() {
+        closedByUser = true
+        hide()
     }
 
     private fun openApp(destination: Destination) {

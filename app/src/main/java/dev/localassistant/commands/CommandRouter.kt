@@ -20,6 +20,9 @@ sealed interface Command {
 
     /** Search the web for [query] and let the model answer from what comes back. */
     data class Lookup(val query: String) : Command
+
+    /** Read what [app] shows and let the model answer from it. */
+    data class Read(val app: String) : Command
 }
 
 /**
@@ -37,7 +40,8 @@ class CommandRouter {
         val said = Said.of(utterance) ?: return null
         // Actions before searches: "dile a Ana que tengo noticias" is a message, not the news.
         return showOnMap(said, spanish)
-            ?: youtube(said, spanish)
+            ?: readApp(said)
+            ?: siteSearch(said, spanish)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
             ?: navigate(said, spanish)
@@ -50,6 +54,12 @@ class CommandRouter {
     }
 
     private fun searches(said: Said): Command? = lookup(said) ?: recent(said)
+
+    private fun readApp(said: Said): Command? {
+        val match = READ_APP.find(said.folded) ?: READ_NAMED_APP.find(said.folded) ?: return null
+        val app = said.original(match.groups[1]!!.range)
+        return if (app.split(' ').size <= MAX_NAME_WORDS) Command.Read(app) else null
+    }
 
     /**
      * Removing or asking about an alarm is not a request for one, and the clock app sets it
@@ -117,13 +127,15 @@ class CommandRouter {
         )
     }
 
-    private fun youtube(said: Said, spanish: Boolean): Command? {
-        val match = YOUTUBE.find(said.folded) ?: return null
+    private fun siteSearch(said: Said, spanish: Boolean): Command? {
+        val match = SITE_SEARCH.find(said.folded) ?: return null
         val query = said.original(match.groups[1]!!.range)
+        val site = match.groups[2]!!.value
+        val shown = SITE_NAMES.getValue(site)
         return Command.Action(
-            "search_youtube",
-            mapOf("query" to query),
-            if (spanish) "Buscando $query en YouTube." else "Searching YouTube for $query.",
+            "search_site",
+            mapOf("site" to site, "query" to query),
+            if (spanish) "Buscando $query en $shown." else "Searching $shown for $query.",
         )
     }
 
@@ -288,9 +300,26 @@ class CommandRouter {
                 """match|game|race|grand prix|result|results|standings|league|champion|election|president|prime minister|""" +
                 """pope|price|prices|stock|news|version|update|episode|season|release|album|earthquake|strike)\b""",
         )
-        val YOUTUBE = Regex(
-            """^(?:(?:abre|open) youtube (?:y|and) )?(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|""" +
-                """search(?: for)?|find|look up|play|show me) (?:(?:un |el |a |the )?videos? (?:de |sobre |of |about )?)?(.+?) (?:en|on) youtube$""",
+        // "Qué me ha dicho mamá en WhatsApp", "lee mis mensajes de Telegram", "what's new on Signal".
+        val READ_APP = Regex(
+            """^(?:lee(?:me)?|leer|mira|revisa|que (?:pone|hay|dice|tengo)|que me (?:ha|han) (?:dicho|escrito|mandado|puesto)|""" +
+                """que mensajes tengo|tengo mensajes|read(?: me)?|check|what(?:'s| is| does| did)?(?: .{1,40}?)? (?:say|said|new)|""" +
+                """any (?:new )?messages)\b.*? (?:en|de|in|on|from) (?:el |la |mi |mis |the |my )?""" +
+                """(?:app (?:de |del )?|chats? (?:de |del )?|mensajes (?:de |del )?)?""" +
+                """(whatsapp|telegram|signal|gmail|thunderbird|instagram|messages|mensajes|sms|discord|slack|outlook|proton ?mail|element)$""",
+        )
+        // Any app, as long as it is called an app: "lee la app de Ajustes y dime cuánto espacio
+        // libre tengo". Without the word, "lee esto" or "revisa el correo" are left to the model.
+        val READ_NAMED_APP = Regex(
+            """^(?:lee(?:me)?|leer|revisa|mira en|que (?:pone|hay|dice|sale) en|read|check) """ +
+                """(?:la |the )?(?:app(?:licacion)?|application) (?:de |del |of )?(.+?)(?: (?:y|and) .+)?$""",
+        )
+        val SITE_NAMES = mapOf("youtube" to "YouTube", "amazon" to "Amazon", "aliexpress" to "AliExpress", "wikipedia" to "Wikipedia")
+        val SITE_SEARCH = Regex(
+            """^(?:(?:abre|abreme|open) (?:youtube|amazon|aliexpress|wikipedia) (?:y|and) )?""" +
+                """(?:busca(?:me)?|buscar|pon(?:me)?|reproduce|ensename|muestrame|encuentrame|""" +
+                """search(?: for)?|find|look up|play|show me) (?:(?:un |el |a |the )?videos? (?:de |sobre |of |about )?)?""" +
+                """(.+?) (?:en|on|in) (youtube|amazon|aliexpress|wikipedia)$""",
         )
         val CURRENT_AFFAIRS = Regex(
             """\b(?:noticias|titulares|news|headlines|pronostico|forecast|weather)\b|""" +

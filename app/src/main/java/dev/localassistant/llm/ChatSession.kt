@@ -5,6 +5,7 @@ import dev.localassistant.AssistantRuntime
 import dev.localassistant.commands.Command
 import dev.localassistant.commands.CommandRouter
 import dev.localassistant.commands.SpokenText
+import dev.localassistant.screen.AppReaderService
 import dev.localassistant.history.ConversationStore
 import dev.localassistant.loggable
 import dev.localassistant.tools.AssistantTool
@@ -181,6 +182,29 @@ class ChatSession(
                     command.confirmation
                 }
             }
+            is Command.Read -> {
+                val reader = tools?.available()?.firstOrNull { it.name == READ_APP } ?: return false
+                if (AppReaderService.instance == null) {
+                    return say(
+                        if (spanish) "Para leer otras apps, activa «Leer otras apps» en Ajustes, en Permisos." else
+                            "To read other apps, turn on Read other apps in Settings, under Permissions.",
+                        listener,
+                    )
+                }
+                val shown = withContext(Dispatchers.IO) {
+                    runCatching { JSONObject(reader.run(JSONObject().put("app", command.app))) }.getOrNull()
+                } ?: return false
+                val text = shown.optString("text").ifBlank { return false }
+                // What the app shows goes in with the question, the same way search results do,
+                // so the model reads rather than deciding whether to look.
+                _messages.update { list ->
+                    val asked = list.indexOfLast { it.role == Role.USER }
+                    list.mapIndexed { index, message ->
+                        if (index == asked) message.copy(modelText = withAppText(prompt, shown.optString("app"), text)) else message
+                    }
+                }
+                return false
+            }
             is Command.Lookup -> {
                 // Without search, or when it fails, the model still answers: it can say it has no
                 // access, or answer what it knows, which beats a fixed refusal for a question
@@ -214,6 +238,15 @@ class ChatSession(
     private fun clockLine() = "[" + SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.ENGLISH).format(Date()) +
         " " + TimeZone.getDefault().id + "]"
 
+    private fun withAppText(question: String, app: String, text: String): String = buildString {
+        appendLine("Text currently shown by $app on the user's phone:")
+        appendLine("<<<")
+        appendLine(text)
+        appendLine(">>>")
+        append("Answer from this text only, briefly, and do not read out everything: ")
+        append(question)
+    }
+
     private fun withResults(question: String, query: String, results: JSONArray): String = buildString {
         // What a search brings back is only "recent" against today's date.
         clock = clockLine()
@@ -222,10 +255,13 @@ class ChatSession(
         appendLine("<<<")
         for (i in 0 until results.length()) {
             val result = results.getJSONObject(i)
-            appendLine("${i + 1}. ${result.optString("title")}: ${result.optString("snippet")}")
+            appendLine("${i + 1}. ${result.optString("title")} (${result.optString("url")}): ${result.optString("snippet")}")
         }
         appendLine(">>>")
-        append("Answer from these results, in one or two sentences: ")
+        // Asked to "give me the links" the model used to describe what it had found instead of
+        // opening any of it; it can only offer what it is told the addresses are.
+        append("Answer from these results, in one or two sentences, and say which site it comes from. ")
+        append("If the user wants to see or open one, call open_link with its address. ")
         append(question)
     }
 
@@ -450,6 +486,7 @@ class ChatSession(
         const val TAG = "ChatSession"
         const val MAX_TOOL_ROUNDS = 4
         const val WEB_SEARCH = "web_search"
+        const val READ_APP = "read_app"
         const val THINK_END = "</think>"
         const val SCREEN_TEXT_MARK = "Text on the user's screen:"
         val TIME_WORDS = Regex(
