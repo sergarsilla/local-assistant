@@ -124,7 +124,7 @@ class BenchmarkActivity : Activity() {
         }
         intent.getStringExtra("tts")?.let { packId ->
             thread(name = "tts") {
-                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)!!) }
+                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)!!, intent.getStringExtra("text")) }
                     .onFailure { report("FAILED tts $packId: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
