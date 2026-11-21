@@ -176,6 +176,9 @@ class ChatSession(
                 }
                 Log.i(TAG, "Command ${command.tool} -> ${loggable(result.toString().take(120))}")
                 if (result == null || result.has("error")) return false
+                if (result.has("waiting_for_user")) {
+                    return say(if (spanish) "Toca Confirmar para hacerlo." else "Tap Confirm to do it.", listener)
+                }
                 val resolved = result.optString(RESOLVED)
                 if (command.subject != null && resolved.isNotEmpty()) {
                     command.confirmation.replace(command.subject, resolved)
@@ -244,7 +247,8 @@ class ChatSession(
         appendLine("<<<")
         appendLine(text)
         appendLine(">>>")
-        append("Answer from this text only, briefly, and do not read out everything: ")
+        append("Answer from this text only, briefly, and do not read out everything. ")
+        append("Copy any number you use exactly as the text writes it, in digits with its unit, such as 87,22 GB: ")
         append(question)
     }
 
