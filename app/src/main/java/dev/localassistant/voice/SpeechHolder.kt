@@ -16,6 +16,8 @@ class SpeechHolder(private val context: Context, private val scope: CoroutineSco
     private val mutex = Mutex()
     private var loaded: SpeechToText? = null
     private var loadedPack: VoicePack? = null
+    private var second: SpeechToText? = null
+    private var secondPack: VoicePack? = null
     private var releaseJob: Job? = null
 
     /** Warms the recognizer up so the first utterance is not delayed by a cold load. */
@@ -31,7 +33,22 @@ class SpeechHolder(private val context: Context, private val scope: CoroutineSco
     suspend fun transcribe(pack: VoicePack, samples: FloatArray, language: String): String = mutex.withLock {
         releaseJob?.cancel()
         val stt = loadLocked(pack)
-        withContext(Dispatchers.Default) { stt.transcribe(samples, language) }
+        val text = withContext(Dispatchers.Default) { stt.transcribe(samples, language) }
+        val retry = SecondOpinion.pack(pack, language, text) { it.isInstalled(context) } ?: return@withLock text
+        Log.i(TAG, "Transcript came out in another language; retrying with ${retry.id}")
+        val second = secondLocked(retry)
+        withContext(Dispatchers.Default) { second.transcribe(samples, language) }.ifBlank { text }
+    }
+
+    private suspend fun secondLocked(pack: VoicePack): SpeechToText {
+        second?.takeIf { secondPack == pack }?.let { return it }
+        second?.close()
+        second = null
+        secondPack = null
+        val stt = withContext(Dispatchers.IO) { SpeechToText.load(context, pack) }
+        second = stt
+        secondPack = pack
+        return stt
     }
 
     /** Loads the recognizer; prefer [transcribe], which also keeps it from being freed mid-use. */
@@ -62,6 +79,9 @@ class SpeechHolder(private val context: Context, private val scope: CoroutineSco
                 loaded?.close()
                 loaded = null
                 loadedPack = null
+                second?.close()
+                second = null
+                secondPack = null
             }
         }
     }
@@ -69,5 +89,19 @@ class SpeechHolder(private val context: Context, private val scope: CoroutineSco
     private companion object {
         const val TAG = "SpeechHolder"
         const val RELEASE_DELAY_MS = 30_000L
+    }
+}
+
+/**
+ * Parakeet detects the language itself and is the most accurate model on Spanish, but now and then
+ * it hears Spanish as English and writes an English sentence. Canary is told the language, so it
+ * cannot drift; it gets a second go at exactly those utterances and nothing else.
+ */
+internal object SecondOpinion {
+    fun pack(used: VoicePack, language: String, text: String, installed: (VoicePack) -> Boolean): VoicePack? {
+        if (used != VoicePack.STT_PARAKEET || text.isBlank()) return null
+        val heard = LanguageGuess.of(text) ?: return null
+        if (heard == language) return null
+        return VoicePack.STT_CANARY.takeIf(installed)
     }
 }
