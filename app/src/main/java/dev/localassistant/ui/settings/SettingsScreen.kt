@@ -57,6 +57,7 @@ interface SettingsActions {
     fun requestContacts()
     fun requestNotifications()
     fun openAppSettings()
+    fun openAccessibilitySettings()
     fun setMapsApp(packageName: String?)
     fun setMessagingApp(app: MessagingApp)
     fun setListenOnOpen(value: Boolean)
@@ -318,6 +319,14 @@ private fun PermissionsCard(state: SettingsUiState, actions: SettingsActions) {
             icon = Icons.Filled.Notifications,
             granted = status.notificationsGranted,
             request = actions::requestNotifications,
+        )
+        // Accessibility is switched on only from the system's own list, never by an app.
+        ActionRow(
+            title = stringResource(R.string.settings_read_apps),
+            summary = stringResource(if (status.appReaderEnabled) R.string.settings_read_apps_on else R.string.settings_read_apps_off),
+            icon = AssistantIcons.Visibility,
+            actionLabel = if (status.appReaderEnabled) null else stringResource(R.string.step_allow),
+            onClick = actions::openAccessibilitySettings,
         )
         // Android only lets the user change this one from the system's own page for the app.
         ActionRow(

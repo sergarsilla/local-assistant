@@ -121,10 +121,7 @@ class OpenAppTool(
         }
         listener.onToolStarted(name, arguments.optString("name"))
         val packages = context.packageManager
-        val installed = packages
-            .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-            .map { it.activityInfo.packageName to packages.getApplicationLabel(it.activityInfo.applicationInfo).toString() }
-            .distinctBy { it.first }
+        val installed = InstalledLaunchers.list(context)
         val match = AppMatcher.best(arguments.optString("name"), installed)
             // The model may use another language for the app name, so it gets the real list to retry.
             ?: return JSONObject()

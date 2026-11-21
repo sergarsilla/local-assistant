@@ -193,6 +193,16 @@ class CommandRouterTest {
     }
 
     @Test
+    fun `asking what an app shows reads it`() {
+        assertEquals(Command.Read("WhatsApp"), es("¿Qué me ha dicho mamá en WhatsApp?"))
+        assertEquals(Command.Read("Telegram"), es("Léeme los mensajes de Telegram"))
+        assertEquals(Command.Read("whatsapp"), es("qué tengo en whatsapp"))
+        assertEquals(Command.Read("Signal"), en("What's new on Signal?"))
+        assertNull(es("¿Qué es WhatsApp?"))
+        assertEquals("open_app", action(es("Abre WhatsApp")).tool)
+    }
+
+    @Test
     fun `anything that is not plainly a command goes to the model`() {
         val questions = listOf(
             "¿Qué es un temporizador?",

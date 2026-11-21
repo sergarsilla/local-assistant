@@ -21,6 +21,7 @@ data class SystemStatus(
     val screenshotEnabled: Boolean = false,
     val keyboardEnabled: Boolean = false,
     val networkAllowed: Boolean = true,
+    val appReaderEnabled: Boolean = false,
     val freeBytes: Long = Long.MAX_VALUE,
 ) {
     companion object {
@@ -38,6 +39,7 @@ data class SystemStatus(
                 screenshotEnabled = Settings.Secure.getInt(resolver, "assist_screenshot_enabled", 1) == 1,
                 keyboardEnabled = keyboardEnabled(context),
                 networkAllowed = granted(Manifest.permission.INTERNET),
+                appReaderEnabled = dev.localassistant.screen.AppReaderService.isEnabled(context),
                 freeBytes = StatFs(context.filesDir.path).availableBytes,
             )
         }

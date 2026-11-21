@@ -55,6 +55,7 @@ fun SettingsRoute(
             override fun requestMicrophone() = askMic()
             override fun requestContacts() = askContacts()
             override fun requestNotifications() = askNotifications()
+            override fun openAccessibilitySettings() = context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             override fun openAppSettings() = context.startActivity(
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
             )

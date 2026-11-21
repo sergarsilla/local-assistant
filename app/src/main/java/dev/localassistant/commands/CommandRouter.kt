@@ -20,6 +20,9 @@ sealed interface Command {
 
     /** Search the web for [query] and let the model answer from what comes back. */
     data class Lookup(val query: String) : Command
+
+    /** Read what [app] shows and let the model answer from it. */
+    data class Read(val app: String) : Command
 }
 
 /**
@@ -37,6 +40,7 @@ class CommandRouter {
         val said = Said.of(utterance) ?: return null
         // Actions before searches: "dile a Ana que tengo noticias" is a message, not the news.
         return showOnMap(said, spanish)
+            ?: readApp(said)
             ?: siteSearch(said, spanish)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
@@ -50,6 +54,12 @@ class CommandRouter {
     }
 
     private fun searches(said: Said): Command? = lookup(said) ?: recent(said)
+
+    private fun readApp(said: Said): Command? {
+        val match = READ_APP.find(said.folded) ?: return null
+        val app = said.original(match.groups[1]!!.range)
+        return if (app.split(' ').size <= MAX_NAME_WORDS) Command.Read(app) else null
+    }
 
     /**
      * Removing or asking about an alarm is not a request for one, and the clock app sets it
@@ -289,6 +299,14 @@ class CommandRouter {
                 """noticia|noticias|version|actualizacion|episodio|capitulo|temporada|estreno|album|disco|terremoto|huelga|""" +
                 """match|game|race|grand prix|result|results|standings|league|champion|election|president|prime minister|""" +
                 """pope|price|prices|stock|news|version|update|episode|season|release|album|earthquake|strike)\b""",
+        )
+        // "Qué me ha dicho mamá en WhatsApp", "lee mis mensajes de Telegram", "what's new on Signal".
+        val READ_APP = Regex(
+            """^(?:lee(?:me)?|leer|mira|revisa|que (?:pone|hay|dice|tengo)|que me (?:ha|han) (?:dicho|escrito|mandado|puesto)|""" +
+                """que mensajes tengo|tengo mensajes|read(?: me)?|check|what(?:'s| is| does| did)?(?: .{1,40}?)? (?:say|said|new)|""" +
+                """any (?:new )?messages)\b.*? (?:en|de|in|on|from) (?:el |la |mi |mis |the |my )?""" +
+                """(?:app (?:de |del )?|chats? (?:de |del )?|mensajes (?:de |del )?)?""" +
+                """(whatsapp|telegram|signal|gmail|thunderbird|instagram|messages|mensajes|sms|discord|slack|outlook|proton ?mail|element)$""",
         )
         val SITE_NAMES = mapOf("youtube" to "YouTube", "amazon" to "Amazon", "aliexpress" to "AliExpress", "wikipedia" to "Wikipedia")
         val SITE_SEARCH = Regex(

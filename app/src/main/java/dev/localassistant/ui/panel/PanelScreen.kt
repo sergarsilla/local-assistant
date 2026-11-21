@@ -253,6 +253,7 @@ private fun toolLabel(activity: ToolActivity): String {
         "call_contact" -> R.string.panel_tool_call
         "search_site" -> R.string.panel_tool_site_search
         "open_link" -> R.string.panel_tool_open_link
+        "read_app" -> R.string.panel_tool_read_app
         else -> return activity.name
     }
     return stringResource(res, activity.summary)
