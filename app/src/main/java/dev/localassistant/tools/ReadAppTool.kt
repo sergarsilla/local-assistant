@@ -6,7 +6,6 @@ import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.os.SystemClock
 import dev.localassistant.screen.AppReaderService
-import dev.localassistant.screen.AppScreen
 import org.json.JSONObject
 import java.util.Locale
 
@@ -33,7 +32,7 @@ class ReadAppTool(
     override fun run(arguments: JSONObject): String {
         val reader = AppReaderService.instance
             ?: return error(
-                "reading other apps is turned off; tell the user to turn on Read other apps in the assistant's " +
+                "reading other apps is turned off; tell the user to turn on Read and use other apps in the assistant's " +
                     "Settings, under Permissions",
             )
         val wanted = arguments.optString("app").trim()
@@ -61,25 +60,27 @@ class ReadAppTool(
         }
     }
 
-    private fun poll(timeoutMs: Long, read: () -> AppScreen?): AppScreen? {
-        val deadline = SystemClock.elapsedRealtime() + timeoutMs
-        while (SystemClock.elapsedRealtime() < deadline) {
-            SystemClock.sleep(POLL_MS)
-            read()?.let { return it }
-        }
-        return null
-    }
-
     private fun result(app: String, text: String) =
         JSONObject().put("app", app).put("text", text).put(RESOLVED, app).toString()
 
     private fun error(message: String) = JSONObject().put("error", message).toString()
 
     private companion object {
-        const val OPEN_TIMEOUT_MS = 6_000L
         const val SETTLE_TIMEOUT_MS = 2_000L
-        const val POLL_MS = 300L
     }
+}
+
+internal const val OPEN_TIMEOUT_MS = 6_000L
+private const val POLL_MS = 300L
+
+/** Asks [read] every few hundred milliseconds until it answers or [timeoutMs] runs out. */
+internal fun <T> poll(timeoutMs: Long, read: () -> T?): T? {
+    val deadline = SystemClock.elapsedRealtime() + timeoutMs
+    while (SystemClock.elapsedRealtime() < deadline) {
+        SystemClock.sleep(POLL_MS)
+        read()?.let { return it }
+    }
+    return null
 }
 
 /** Runs work that needs the panel out of the way, bringing it back afterwards. */
