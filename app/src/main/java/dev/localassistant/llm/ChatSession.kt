@@ -38,11 +38,14 @@ data class UiMessage(
     val role: Role,
     val text: String,
     val streaming: Boolean = false,
-    val modelText: String = text,
+    /** Set only when it differs from [text]; a reply is written into [text] as it streams in. */
+    private val decorated: String? = null,
     val image: ByteArray? = null,
     /** True when what was on screen went to the model with this message. */
     val withScreen: Boolean = false,
-)
+) {
+    val modelText: String get() = decorated ?: text
+}
 
 /** What was on screen, to send along with a question. */
 class ScreenAttachment(
@@ -58,8 +61,39 @@ interface ReplyListener {
     fun onEnd()
 }
 
+/** [fill] runs from 0 to 1; [forgotten] is set once the oldest turns had to be left out. */
+data class ContextState(val fill: Float = 0f, val forgotten: Boolean = false) {
+    val nearlyFull: Boolean get() = forgotten || fill >= WARN_AT
+
+    private companion object {
+        const val WARN_AT = 0.75f
+    }
+}
+
+/** Which messages to leave out when the conversation no longer fits. */
+internal object ContextTrim {
+    /**
+     * Drops half of what is left, at least a question and its answer, so a long chat fits again
+     * within a retry or two: each retry processes the whole remaining history again, which takes
+     * seconds. The kept part starts at a question, and the latest question is always kept.
+     */
+    fun nextSkip(roles: List<Role>, skip: Int): Int =
+        startAt(roles, skip + maxOf(2, (roles.size - skip) / 2))
+
+    /** The first question at or after [skip], never past the latest one. */
+    fun startAt(roles: List<Role>, skip: Int): Int {
+        val last = roles.lastIndex
+        var next = minOf(last, skip).coerceAtLeast(0)
+        while (next < last && roles[next] != Role.USER) next++
+        return next
+    }
+}
+
 sealed interface ChatError {
     data object NoModel : ChatError
+
+    /** A single question longer than the whole context window. */
+    data object TooLong : ChatError
     data class Failure(val message: String) : ChatError
 }
 
@@ -88,6 +122,14 @@ class ChatSession(
 
     private val _error = MutableStateFlow<ChatError?>(null)
     val error: StateFlow<ChatError?> = _error.asStateFlow()
+
+    private val _context = MutableStateFlow(ContextState())
+
+    /** How full the conversation is, so the user is told before the model starts forgetting. */
+    val context: StateFlow<ContextState> = _context.asStateFlow()
+
+    /** Oldest messages already left out to fit, so later turns do not overflow again first. */
+    private var leftOut = 0
 
     private var job: Job? = null
     private var turn = 0
@@ -118,7 +160,7 @@ class ChatSession(
         val question = UiMessage(
             role = Role.USER,
             text = prompt,
-            modelText = decorate(prompt, screen),
+            decorated = decorate(prompt, screen),
             image = screen?.image,
             withScreen = screen != null,
         )
@@ -139,6 +181,9 @@ class ChatSession(
                 } else if (!answerDirectly(prompt, listener)) holder.use { engine -> generateFitting(engine, listener) }
             } catch (e: NoModelException) {
                 _error.value = ChatError.NoModel
+                dropEmptyReply()
+            } catch (e: ContextOverflowException) {
+                _error.value = ChatError.TooLong
                 dropEmptyReply()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -204,7 +249,7 @@ class ChatSession(
                 _messages.update { list ->
                     val asked = list.indexOfLast { it.role == Role.USER }
                     list.mapIndexed { index, message ->
-                        if (index == asked) message.copy(modelText = withAppText(prompt, shown.optString("app"), text)) else message
+                        if (index == asked) message.copy(decorated = withAppText(prompt, shown.optString("app"), text)) else message
                     }
                 }
                 return false
@@ -224,7 +269,7 @@ class ChatSession(
                 _messages.update { list ->
                     val asked = list.indexOfLast { it.role == Role.USER }
                     list.mapIndexed { index, message ->
-                        if (index == asked) message.copy(modelText = withResults(prompt, command.query, results)) else message
+                        if (index == asked) message.copy(decorated = withResults(prompt, command.query, results)) else message
                     }
                 }
                 return false
@@ -282,6 +327,8 @@ class ChatSession(
         stop()
         _messages.value = emptyList()
         _error.value = null
+        _context.value = ContextState()
+        leftOut = 0
         conversationId = null
     }
 
@@ -296,6 +343,8 @@ class ChatSession(
                 .filter { it.role == Role.USER || it.role == Role.ASSISTANT }
                 .map { UiMessage(it.role, it.text) }
             _error.value = null
+            _context.value = ContextState()
+            leftOut = 0
             conversationId = id
         }
     }
@@ -331,15 +380,18 @@ class ChatSession(
             }
             ChatMessage(message.role, text, image = image)
         }
-        var skip = 0
+        var skip = ContextTrim.startAt(history.map { it.role }, leftOut)
         while (true) {
             val window = listOf(systemMessage()) + history.drop(skip)
             try {
                 runWithTools(engine, window, listener)
+                leftOut = skip
+                engine.contextFill()?.let { fill -> _context.value = ContextState(fill, forgotten = skip > 0) }
                 return
             } catch (e: ContextOverflowException) {
                 if (history.size - skip <= 1) throw e
-                skip += 2
+                skip = ContextTrim.nextSkip(history.map { it.role }, skip)
+                Log.i(TAG, "Context full: dropping the oldest $skip of ${history.size} messages")
             }
         }
     }

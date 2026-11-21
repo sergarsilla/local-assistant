@@ -32,6 +32,7 @@ fun PanelRoute(
     val messages by chat.messages.collectAsState()
     val generating by chat.generating.collectAsState()
     val error by chat.error.collectAsState()
+    val contextState by chat.context.collectAsState()
     val engine by runtime.engine.state.collectAsState()
     val voiceState by voice.state.collectAsState()
     val speaking by voice.speaker.speaking.collectAsState()
@@ -88,6 +89,7 @@ fun PanelRoute(
             messages = messages,
             generating = generating,
             error = error,
+            context = contextState,
             engine = engine,
             voice = voiceState,
             speaking = speaking,

@@ -64,6 +64,10 @@
     <string name="panel_no_model">No model installed yet.</string>
     <string name="panel_open_models">Choose a model</string>
     <string name="panel_error">Something went wrong: %1$s</string>
+    <string name="panel_context_full">This conversation is getting long. Start a new one to keep answers quick and accurate.</string>
+    <string name="panel_context_forgotten">I no longer remember the start of this conversation. Start a new one for a fresh topic.</string>
+    <string name="panel_context_new">New chat</string>
+    <string name="panel_context_too_long">That message is too long for the model. Try a shorter one.</string>
     <string name="panel_tool_web_search">Searching the web: %1$s</string>
     <string name="panel_tool_read_web_page">Reading %1$s</string>
     <string name="panel_tool_timer">Setting a timer: %1$s</string>
