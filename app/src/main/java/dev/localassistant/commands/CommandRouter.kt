@@ -56,7 +56,7 @@ class CommandRouter {
     private fun searches(said: Said): Command? = lookup(said) ?: recent(said)
 
     private fun readApp(said: Said): Command? {
-        val match = READ_APP.find(said.folded) ?: return null
+        val match = READ_APP.find(said.folded) ?: READ_NAMED_APP.find(said.folded) ?: return null
         val app = said.original(match.groups[1]!!.range)
         return if (app.split(' ').size <= MAX_NAME_WORDS) Command.Read(app) else null
     }
@@ -307,6 +307,12 @@ class CommandRouter {
                 """any (?:new )?messages)\b.*? (?:en|de|in|on|from) (?:el |la |mi |mis |the |my )?""" +
                 """(?:app (?:de |del )?|chats? (?:de |del )?|mensajes (?:de |del )?)?""" +
                 """(whatsapp|telegram|signal|gmail|thunderbird|instagram|messages|mensajes|sms|discord|slack|outlook|proton ?mail|element)$""",
+        )
+        // Any app, as long as it is called an app: "lee la app de Ajustes y dime cuánto espacio
+        // libre tengo". Without the word, "lee esto" or "revisa el correo" are left to the model.
+        val READ_NAMED_APP = Regex(
+            """^(?:lee(?:me)?|leer|revisa|mira en|que (?:pone|hay|dice|sale) en|read|check) """ +
+                """(?:la |the )?(?:app(?:licacion)?|application) (?:de |del |of )?(.+?)(?: (?:y|and) .+)?$""",
         )
         val SITE_NAMES = mapOf("youtube" to "YouTube", "amazon" to "Amazon", "aliexpress" to "AliExpress", "wikipedia" to "Wikipedia")
         val SITE_SEARCH = Regex(

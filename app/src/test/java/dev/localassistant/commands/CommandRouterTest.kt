@@ -199,6 +199,9 @@ class CommandRouterTest {
         assertEquals(Command.Read("whatsapp"), es("qué tengo en whatsapp"))
         assertEquals(Command.Read("Signal"), en("What's new on Signal?"))
         assertNull(es("¿Qué es WhatsApp?"))
+        assertEquals(Command.Read("ajustes"), es("lee la app de ajustes y dime cuanto espacio libre tengo"))
+        assertEquals(Command.Read("Reloj"), es("¿Qué pone en la app del Reloj?"))
+        assertNull(es("Lee esto"))
         assertEquals("open_app", action(es("Abre WhatsApp")).tool)
     }
 

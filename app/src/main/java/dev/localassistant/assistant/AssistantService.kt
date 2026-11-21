@@ -3,6 +3,7 @@ package dev.localassistant.assistant
 import android.os.Bundle
 import android.service.voice.VoiceInteractionService
 import android.util.Log
+import dev.localassistant.AssistantRuntime
 import dev.localassistant.wake.WakeWordService
 import java.lang.ref.WeakReference
 
@@ -10,6 +11,7 @@ class AssistantService : VoiceInteractionService() {
     override fun onReady() {
         super.onReady()
         current = WeakReference(this)
+        AssistantRuntime.tools.reopenPanel = { open(returning = true) }
         Log.i(TAG, "Voice interaction service ready")
         WakeWordService.syncWithSettings(this)
     }
@@ -28,6 +30,9 @@ class AssistantService : VoiceInteractionService() {
         /** Set when the wake word opened the panel: it listens straight away. */
         const val EXTRA_WAKE_WORD = "wake_word"
 
+        /** Set when the panel comes back after stepping aside for a tool: its turn is still running. */
+        const val EXTRA_RETURNING = "returning"
+
         @Volatile
         private var current: WeakReference<AssistantService>? = null
 
@@ -38,11 +43,17 @@ class AssistantService : VoiceInteractionService() {
          * Opens the assistant panel, optionally on a saved conversation. Returns false when this
          * app is not the phone's assistant, so the caller can explain why nothing happened.
          */
-        fun open(conversationId: Long? = null, wakeWord: Boolean = false, flags: Int = 0): Boolean {
+        fun open(
+            conversationId: Long? = null,
+            wakeWord: Boolean = false,
+            flags: Int = 0,
+            returning: Boolean = false,
+        ): Boolean {
             val service = current?.get() ?: return false
             val args = Bundle().apply {
                 conversationId?.let { putLong(EXTRA_CONVERSATION_ID, it) }
                 putBoolean(EXTRA_WAKE_WORD, wakeWord)
+                putBoolean(EXTRA_RETURNING, returning)
             }
             service.showSession(args, flags)
             return true

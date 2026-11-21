@@ -109,7 +109,7 @@ class OpenAppTool(
 
     override fun describe() = """
         {"name":"open_app",
-         "description":"Open an installed app.",
+         "description":"Open an installed app for the user. To find out what an app shows, use read_app instead.",
          "parameters":{"type":"object","properties":{
            "name":{"type":"string","description":"App name."}},
           "required":["name"]}}
@@ -122,7 +122,7 @@ class OpenAppTool(
         listener.onToolStarted(name, arguments.optString("name"))
         val packages = context.packageManager
         val installed = InstalledLaunchers.list(context)
-        val match = AppMatcher.best(arguments.optString("name"), installed)
+        val match = InstalledLaunchers.find(context, arguments.optString("name"), installed)
             // The model may use another language for the app name, so it gets the real list to retry.
             ?: return JSONObject()
                 .put("error", "app not found")
