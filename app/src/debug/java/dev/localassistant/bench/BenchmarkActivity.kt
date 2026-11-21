@@ -38,6 +38,7 @@ import kotlinx.coroutines.runBlocking
  *   --ez convtest true                            runs one spoken reply through the conversation loop
  *   --es toolask "question"                       asks with tools enabled and reports tool usage
  *   --es tool <name> [--es args '{"a":1}']        runs one tool directly, bypassing the model
+ *   --ez contexttest true                         fills a conversation past the context window
  *   --ez historytest true                         checks that deleting a conversation wipes its text
  * Results are written to logcat under the "LocalAssistantBench" tag.
  */
@@ -92,6 +93,14 @@ class BenchmarkActivity : Activity() {
         intent.getStringExtra("toolask")?.let { question ->
             thread(name = "toolask") {
                 runCatching { ToolTest(this, ::report).run(question, intent.getBooleanExtra("preload", false)) }.onFailure { report("FAILED toolask: $it") }
+                report("DONE")
+                runOnUiThread { finish() }
+            }
+            return
+        }
+        if (intent.getBooleanExtra("contexttest", false)) {
+            thread(name = "context") {
+                runCatching { ContextTest(::report).run() }.onFailure { report("FAILED contexttest: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
             }

@@ -1,6 +1,7 @@
 package dev.localassistant.ui.panel
 
 import dev.localassistant.llm.ChatError
+import dev.localassistant.llm.ContextState
 import dev.localassistant.llm.EngineState
 import dev.localassistant.llm.UiMessage
 import dev.localassistant.tools.PendingAction
@@ -13,6 +14,7 @@ data class PanelUiState(
     val messages: List<UiMessage> = emptyList(),
     val generating: Boolean = false,
     val error: ChatError? = null,
+    val context: ContextState = ContextState(),
     val engine: EngineState = EngineState.Idle,
     val voice: VoiceState = VoiceState.Idle,
     val speaking: Boolean = false,

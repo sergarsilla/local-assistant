@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.localassistant.history.ConversationSummary
 import dev.localassistant.llm.ChatError
+import dev.localassistant.llm.ContextState
 import dev.localassistant.llm.EngineState
 import dev.localassistant.llm.Role
 import dev.localassistant.llm.UiMessage
@@ -103,6 +104,19 @@ class ScreenshotTest {
                     UiMessage(Role.ASSISTANT, "Te he preparado el mensaje para Ana. ¿Lo envío?"),
                 ),
                 pendingAction = PendingAction(ActionKind.MESSAGE, "Ana García: Llego en diez minutos", Intent()),
+            ),
+            noop<PanelActions>(),
+        )
+    }
+
+    @Test fun panelContextFull() = capture("panel_context_full") {
+        PanelScreen(
+            panel.copy(
+                messages = listOf(
+                    UiMessage(Role.USER, "¿Y cuál de los dos gasta menos batería?"),
+                    UiMessage(Role.ASSISTANT, "El segundo: su pantalla consume menos y la batería es más grande."),
+                ),
+                context = ContextState(fill = 0.82f),
             ),
             noop<PanelActions>(),
         )

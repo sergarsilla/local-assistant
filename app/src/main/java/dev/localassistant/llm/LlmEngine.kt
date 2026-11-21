@@ -58,6 +58,9 @@ interface LlmEngine : AutoCloseable {
      */
     suspend fun prepare(messages: List<ChatMessage>, tools: List<AssistantTool>) = Unit
 
+    /** How full the context window was after the last reply, from 0 to 1; null when unknown. */
+    fun contextFill(): Float? = null
+
     /** Streams the reply to the last user message; cancelling the collector stops generation. */
     fun generate(
         messages: List<ChatMessage>,
@@ -65,3 +68,6 @@ interface LlmEngine : AutoCloseable {
         maxTokens: Int = 1024,
     ): Flow<GenerationEvent>
 }
+
+/** The conversation no longer fits; the caller drops the oldest turns and tries again. */
+class ContextOverflowException : IllegalStateException("Conversation does not fit in the context window")
