@@ -16,8 +16,8 @@ android {
         applicationId = "dev.localassistant"
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.3.2"
+        versionCode = 6
+        versionName = "0.4.0"
 
         ndk {
             abiFilters += "arm64-v8a"

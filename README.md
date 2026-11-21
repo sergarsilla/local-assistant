@@ -24,7 +24,8 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Optional wake word.** A 5 MB keyword spotter bundled in the APK can listen for "Hey computer"
   in the background. Off by default, with a notification while it runs.
 - **Acts on the phone.** Timers, alarms, opening apps, maps and navigation, calendar events, text
-  messages and calls, finding people in your contacts if you allow it. Anything that sends or
+  messages and calls, finding people in your contacts if you allow it. It can also search inside
+  YouTube, Amazon, AliExpress or Wikipedia, and open a link a web search found. Anything that sends or
   creates something waits for an explicit confirmation. How reliably this works depends on the
   model; see the note below.
 - **Searches the web only if you turn it on.** Off by default. When enabled, the model can query
@@ -33,6 +34,10 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Reads the screen on request.** Only when Android's "use text from screen" is enabled, and only
   when you tap the chip or ask about the screen ("summarise this"). With a vision model, it can
   also look at a screenshot.
+- **Reads other apps when asked.** "What's new on Signal?" or "lee la app de Ajustes y dime cuánto
+  espacio libre tengo" opens that app, reads its text and answers in the panel. It needs an
+  accessibility service you turn on yourself; it only reads, never taps or types, skips password
+  fields, and what it reads goes only to the on-device model.
 - **Keeps history on the phone, if you want.** Conversations are stored in SQLite with
   `secure_delete`; deleting one rewrites the database file so the text is really gone, and saving
   can be turned off. Any conversation can be continued in the assistant.
