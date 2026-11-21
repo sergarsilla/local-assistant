@@ -41,6 +41,7 @@ class CommandRouter {
         // Actions before searches: "dile a Ana que tengo noticias" is a message, not the news.
         return showOnMap(said, spanish)
             ?: readApp(said)
+            ?: inApp(said, spanish)
             ?: siteSearch(said, spanish)
             ?: timer(said, spanish)
             ?: alarm(said, spanish, now)
@@ -55,8 +56,28 @@ class CommandRouter {
 
     private fun searches(said: Said): Command? = lookup(said) ?: recent(said)
 
+    /**
+     * One step in the app on screen, said as plainly as "toca Batería" or "vuelve atrás": the
+     * model would only add seconds to it. Typing is left out, since "escribe a mamá" is a message.
+     */
+    private fun inApp(said: Said, spanish: Boolean): Command? {
+        val done = if (spanish) "Hecho." else "Done."
+        TAP.find(said.folded)?.let { match ->
+            val target = said.original(match.groups[1]!!.range)
+            if (target.split(' ').size > MAX_NAME_WORDS) return null
+            return Command.Action("use_app", mapOf("action" to "tap", "target" to target), done)
+        }
+        if (BACK.matches(said.folded)) return Command.Action("use_app", mapOf("action" to "back"), done)
+        SCROLL.find(said.folded)?.let { match ->
+            val down = match.groups[1] != null
+            return Command.Action("use_app", mapOf("action" to if (down) "scroll_down" else "scroll_up"), done)
+        }
+        return null
+    }
+
     private fun readApp(said: Said): Command? {
-        val match = READ_APP.find(said.folded) ?: READ_NAMED_APP.find(said.folded) ?: return null
+        val match = READ_APP.find(said.folded) ?: READ_NAMED_APP.find(said.folded) ?: READ_APP_EN.find(said.folded)
+            ?: return null
         val app = said.original(match.groups[1]!!.range)
         return if (app.split(' ').size <= MAX_NAME_WORDS) Command.Read(app) else null
     }
@@ -313,6 +334,17 @@ class CommandRouter {
         val READ_NAMED_APP = Regex(
             """^(?:lee(?:me)?|leer|revisa|mira en|que (?:pone|hay|dice|sale) en|read|check) """ +
                 """(?:la |the )?(?:app(?:licacion)?|application) (?:de |del |of )?(.+?)(?: (?:y|and) .+)?$""",
+        )
+        // "Read the Settings app and tell me how much space is free".
+        val READ_APP_EN = Regex("""^(?:read|check) (?:the |my )?(.+?) app(?: (?:and|to) .+)?$""")
+        val TAP = Regex(
+            """^(?:toca(?:me)?|pulsa(?:me)?|presiona|dale (?:a|al)|tap|press|click(?: on)?|hit) """ +
+                """(?:en |sobre |on )?(?:el boton (?:de |del )?|la opcion (?:de )?|the button |the option |the )?(.+)$""",
+        )
+        val BACK = Regex("""(?:(?:vuelve|ve|volver|ir) (?:hacia )?atras|atras|go back|back)""")
+        val SCROLL = Regex(
+            """^(?:(baja|desliza(?: hacia)? abajo|scroll down|sigue bajando)|sube|desliza(?: hacia)? arriba|scroll up)""" +
+                """(?: (?:un poco|mas|la pantalla|a bit|more))?$""",
         )
         val SITE_NAMES = mapOf("youtube" to "YouTube", "amazon" to "Amazon", "aliexpress" to "AliExpress", "wikipedia" to "Wikipedia")
         val SITE_SEARCH = Regex(

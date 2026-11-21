@@ -80,6 +80,7 @@ class UseAppTool(
                         .put("done", outcome.what)
                         .put("app", app)
                         .put("screen", screen?.text.orEmpty().take(MAX_SCREEN))
+                        .put("numbers", COPY_NUMBERS)
                         .put(RESOLVED, app)
                         .toString()
                 }

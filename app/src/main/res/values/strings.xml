@@ -189,7 +189,7 @@
     <string name="settings_recognition">Speech recognition</string>
     <string name="voice_voices_es">Spanish voices</string>
     <string name="voice_voices_en">English voices</string>
-    <string name="voice_pack_stt_canary">Canary 180M · light; set the language by hand</string>
+    <string name="voice_pack_stt_canary">Canary 180M · light; installed next to Parakeet, it fixes only the Spanish sentences Parakeet writes in English</string>
     <string name="voice_pack_stt_parakeet">Parakeet 0.6B · more accurate, detects the language</string>
     <string name="voice_pack_es_davefx">Piper davefx · Spain, male</string>
     <string name="voice_pack_es_miro">Piper miro · Spain, male, high quality</string>

@@ -61,7 +61,7 @@ class ReadAppTool(
     }
 
     private fun result(app: String, text: String) =
-        JSONObject().put("app", app).put("text", text).put(RESOLVED, app).toString()
+        JSONObject().put("app", app).put("text", text).put("numbers", COPY_NUMBERS).put(RESOLVED, app).toString()
 
     private fun error(message: String) = JSONObject().put("error", message).toString()
 
@@ -71,6 +71,9 @@ class ReadAppTool(
 }
 
 internal const val OPEN_TIMEOUT_MS = 6_000L
+
+/** Left alone, the model wrote 87,22 GB as "ochenta y siete mil doscientos veinte". */
+internal const val COPY_NUMBERS = "copy any number you use exactly as the screen writes it, in digits with its unit"
 private const val POLL_MS = 300L
 
 /** Asks [read] every few hundred milliseconds until it answers or [timeoutMs] runs out. */
