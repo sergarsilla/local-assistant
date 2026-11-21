@@ -283,10 +283,14 @@
     <string name="catalog_note_qwen35_4b">The sharpest answers measured here, at a third of the speed: about 5 tokens a second, and over a minute to load the first time.</string>
     <string name="panel_tool_site_search">Searching %1$s</string>
     <string name="panel_tool_open_link">Opening %1$s</string>
-    <string name="app_reader_name">Local assistant: read apps</string>
-    <string name="app_reader_description">Lets the assistant read the text of an app when you ask it to, such as your latest chats. It reads nothing on its own, keeps nothing, and nothing leaves the phone.</string>
+    <string name="app_reader_name">Local assistant: read and use apps</string>
+    <string name="app_reader_description">Lets the assistant read an app and tap, type or scroll in it when you ask it to, such as reading your latest chats or writing a reply. It does nothing on its own, keeps nothing, and nothing leaves the phone. Sending, deleting or paying always waits for you to confirm.</string>
     <string name="panel_tool_read_app">Reading %1$s</string>
-    <string name="settings_read_apps">Read other apps</string>
-    <string name="settings_read_apps_on">On: the assistant can read an app when you ask, such as your latest chats.</string>
+    <string name="settings_read_apps">Read and use other apps</string>
+    <string name="settings_read_apps_on">On: when you ask, the assistant can read an app and tap or type in it. Sending, deleting or paying waits for you to confirm.</string>
     <string name="settings_read_apps_off">Off. Turn it on in the list, under Downloaded apps. If Android says it is a restricted setting: App info, ⋮ menu, Allow restricted settings, then try again.</string>
+    <string name="panel_tool_use_app">In the app: %1$s</string>
+    <string name="panel_action_send_title">Send this?</string>
+    <string name="panel_action_delete_title">Delete this?</string>
+    <string name="panel_action_pay_title">Pay for this?</string>
 </resources>

@@ -124,7 +124,7 @@ class BenchmarkActivity : Activity() {
         }
         intent.getStringExtra("tts")?.let { packId ->
             thread(name = "tts") {
-                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)!!) }
+                runCatching { TtsBench(this, ::report).run(VoicePack.byId(packId)!!, intent.getStringExtra("text")) }
                     .onFailure { report("FAILED tts $packId: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
@@ -136,6 +136,25 @@ class BenchmarkActivity : Activity() {
                 runCatching { VoicePipelineBench(this, ::report).run(clip, intent.getStringExtra("lang") ?: "es") }
                     .onFailure { report("FAILED voice $clip: $it") }
                 report("MEM ${memoryStats()}")
+                report("DONE")
+                runOnUiThread { finish() }
+            }
+            return
+        }
+        intent.getStringExtra("secondopinion")?.let { subdir ->
+            thread(name = "second-opinion") {
+                runCatching {
+                    val dir = java.io.File(getExternalFilesDir("bench"), subdir)
+                    val pack = VoicePack.STT_PARAKEET
+                    kotlinx.coroutines.runBlocking {
+                        for (clip in dir.listFiles { f -> f.name.endsWith(".wav") }.orEmpty().sorted()) {
+                            val wave = com.k2fsa.sherpa.onnx.WaveReader.readWave(clip.path)
+                            val first = AssistantRuntime.speech.acquire(pack).transcribe(wave.samples, "es")
+                            val final = AssistantRuntime.speech.transcribe(pack, wave.samples, "es")
+                            report("SECOND ${clip.name} retried=${first != final} parakeet='$first' final='$final'")
+                        }
+                    }
+                }.onFailure { report("FAILED secondopinion: $it") }
                 report("DONE")
                 runOnUiThread { finish() }
             }

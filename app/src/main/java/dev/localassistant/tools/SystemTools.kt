@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import dev.localassistant.screen.AppControl
+import dev.localassistant.screen.AppReaderService
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +21,18 @@ fun interface ActivityLauncher {
 }
 
 /** What a proposed action does, so the panel can phrase its question and pick an icon. */
-enum class ActionKind { MESSAGE, CALENDAR_EVENT }
+enum class ActionKind { MESSAGE, CALENDAR_EVENT, SEND, DELETE, PAY }
 
-/** An action the model proposed; it only runs when the user taps it. */
-data class PendingAction(val kind: ActionKind, val detail: String, val intent: Intent)
+/**
+ * An action the model proposed; it only runs when the user taps it. Either an [intent] for another
+ * app to handle, or a step to [perform] inside the app on screen.
+ */
+data class PendingAction(
+    val kind: ActionKind,
+    val detail: String,
+    val intent: Intent? = null,
+    val perform: (() -> Unit)? = null,
+)
 
 /** Holds the action waiting for confirmation in the panel. */
 class ActionQueue {
@@ -37,10 +47,11 @@ class ActionQueue {
         _pending.value = null
     }
 
-    fun confirm(launcher: ActivityLauncher) {
+    fun confirm(launcher: ActivityLauncher, inApp: (() -> Unit) -> Unit) {
         val action = _pending.value ?: return
         _pending.value = null
-        launcher.launch(action.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true)
+        action.intent?.let { launcher.launch(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true) }
+        action.perform?.let(inApp)
     }
 }
 
@@ -103,6 +114,7 @@ class AlarmTool(private val launcher: ActivityLauncher, private val listener: To
 class OpenAppTool(
     private val context: Context,
     private val launcher: ActivityLauncher,
+    private val aside: PanelAside,
     private val listener: ToolActivityListener,
 ) : AssistantTool {
     override val name = "open_app"
@@ -130,7 +142,24 @@ class OpenAppTool(
                 .toString()
         val intent = packages.getLaunchIntentForPackage(match.first)
             ?: return JSONObject().put("error", "app cannot be opened").toString()
-        return start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}", resolved = match.second)
+        // The panel only steps aside: "open Settings and go to Battery" goes on in the same turn.
+        return aside.during {
+            val opened = start(launcher, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), "opened ${match.second}", false, match.second)
+            withLabels(opened, match.first)
+        }
+    }
+
+    /**
+     * What can be tapped in the app just opened, so a next step uses the words on screen: the
+     * screen may be in another language than the user's ("Battery" for "batería").
+     */
+    private fun withLabels(result: String, pkg: String): String {
+        val reader = AppReaderService.instance ?: return result
+        val control = AppControl(reader, context.packageName)
+        val labels = poll(OPEN_TIMEOUT_MS) {
+            control.takeIf { it.topPackage() == pkg }?.tappableLabels()?.takeIf { it.isNotEmpty() }
+        } ?: return result
+        return JSONObject(result).put("labels", JSONArray(labels)).toString()
     }
 
     private companion object {

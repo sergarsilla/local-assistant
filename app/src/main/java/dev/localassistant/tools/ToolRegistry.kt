@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import kotlin.concurrent.thread
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,40 +32,64 @@ class ToolRegistry(private val context: Context, apps: AppPreferences) {
     @Volatile
     var reopenPanel: (() -> Unit)? = null
 
+    /** Lets a panel that was moved aside go for good, as if the user had closed it. */
+    @Volatile
+    var releasePanel: (() -> Unit)? = null
+
+    /** Whether a tool that moved the panel aside found something the user should see in it. */
+    @Volatile
+    private var answerToShow = false
+
+    @Volatile
+    private var panelVisible = false
+
     /**
-     * True while a tool has the panel out of the way to look at the app under it: the panel's
-     * window covers the whole screen, so nothing below can be read while it is up.
+     * True from the moment a tool moves the panel aside until the turn ends. The panel's window
+     * covers the whole screen, so nothing below can be read or touched while it is up; while this
+     * is true, the panel being hidden must not end the turn.
      */
     @Volatile
-    var panelSteppedAside = false
+    var panelAway = false
         private set
 
-    @Volatile
-    private var panelHidden = false
-
-    /** Called by the panel when it is hidden while stepped aside, so it comes back afterwards. */
-    fun onPanelHiddenAside() {
-        panelHidden = true
+    fun onPanelShown() {
+        panelVisible = true
+        panelAway = false
     }
 
+    fun onPanelHidden() {
+        panelVisible = false
+    }
+
+    /** Moves the panel aside for the rest of the turn, so the app below can be seen and used. */
     private val stepAside = PanelAside { work ->
         val hide = hidePanel
-        panelHidden = false
-        panelSteppedAside = hide != null
-        hide?.invoke()
-        // Reading before the panel is gone would see only the panel, and a turn ending before the
-        // hide lands would let that hide cancel the next one.
-        val until = SystemClock.elapsedRealtime() + HIDE_TIMEOUT_MS
-        while (hide != null && !panelHidden && SystemClock.elapsedRealtime() < until) SystemClock.sleep(HIDE_POLL_MS)
-        try {
-            work()
-        } finally {
-            panelSteppedAside = false
-            if (panelHidden) {
-                panelHidden = false
-                reopenPanel?.invoke()
-            }
+        if (!panelAway && panelVisible && hide != null) {
+            panelAway = true
+            answerToShow = false
+            hide()
+            awaitPanelGone()
         }
+        work()
+    }
+
+    /** As [stepAside], for a tool whose result the user will want to read in the panel. */
+    private val stepAsideToAnswer = PanelAside { work -> stepAside.during(work).also { answerToShow = true } }
+
+    /**
+     * Called when a turn ends. A panel moved aside comes back if the turn found something to show,
+     * such as what an app said; after only opening an app it stays out of the way.
+     */
+    fun endTurn() {
+        if (!panelAway) return
+        panelAway = false
+        if (answerToShow) reopenPanel?.invoke() else releasePanel?.invoke()
+        answerToShow = false
+    }
+
+    private fun awaitPanelGone() {
+        val until = SystemClock.elapsedRealtime() + HIDE_TIMEOUT_MS
+        while (panelVisible && SystemClock.elapsedRealtime() < until) SystemClock.sleep(HIDE_POLL_MS)
     }
 
     private val prefs = context.getSharedPreferences("tools", Context.MODE_PRIVATE)
@@ -94,14 +119,15 @@ class ToolRegistry(private val context: Context, apps: AppPreferences) {
     private val onDevice = listOf(
         TimerTool(launcher, listener),
         AlarmTool(launcher, listener),
-        OpenAppTool(context, launcher, listener),
+        OpenAppTool(context, launcher, stepAside, listener),
         MapsTool(apps, installed, launcher, listener),
         CalendarTool(actions, listener),
         SendMessageTool(actions, contacts, apps, installed, listener),
         CallTool(launcher, contacts, listener),
         SiteSearchTool(launcher, listener),
         OpenLinkTool(launcher, listener),
-        ReadAppTool(context, launcher, stepAside, listener),
+        ReadAppTool(context, launcher, stepAsideToAnswer, listener),
+        UseAppTool(context, launcher, stepAsideToAnswer, actions, listener),
     )
     private val online = listOf(WebSearchTool(listener), ReadPageTool(listener))
 
@@ -114,7 +140,18 @@ class ToolRegistry(private val context: Context, apps: AppPreferences) {
     fun webSearchEnabled() = _webSearch.value && networkAllowed()
 
     /** Runs the action the user just confirmed, from wherever activity starts are allowed. */
-    fun confirmPendingAction() = actions.confirm(launcher)
+    /**
+     * An in-app step runs with the panel closed for good: the turn is over, and the user stays in
+     * the app to see what happened.
+     */
+    fun confirmPendingAction() = actions.confirm(launcher) { perform ->
+        val hide = hidePanel
+        thread(name = "in-app action") {
+            hide?.invoke()
+            awaitPanelGone()
+            perform()
+        }
+    }
 
     fun networkAllowed() =
         context.checkSelfPermission(Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED

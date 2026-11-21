@@ -16,7 +16,11 @@ import java.io.File
 /** Speaks one sentence with a candidate voice and reports how much faster than real time it is. */
 class TtsBench(private val context: Context, private val report: (String) -> Unit) {
 
-    fun run(pack: VoicePack) {
+    /**
+     * With [text] that sentence is spoken instead, and the audio is transcribed back instead of
+     * played: a cheap check of how the voice reads numbers, units and symbols.
+     */
+    fun run(pack: VoicePack, text: String? = null) {
         val voiceDir = pack.id
         val speakerId = pack.speakerId
         val dir = pack.directory(context)
@@ -25,14 +29,22 @@ class TtsBench(private val context: Context, private val report: (String) -> Uni
         val loaded = SystemClock.elapsedRealtime()
 
         val start = SystemClock.elapsedRealtime()
-        val audio = tts.generate(SENTENCE, sid = speakerId, speed = 1.0f)
+        val audio = tts.generate(text ?: SENTENCE, sid = speakerId, speed = 1.0f)
         val generateMs = SystemClock.elapsedRealtime() - start
         val audioMs = audio.samples.size * 1000L / audio.sampleRate
         report(
             "TTS $voiceDir sid=$speakerId load=${loaded - loadStart}ms generate=${generateMs}ms " +
                 "audio=${audioMs}ms speed=%.1fx".format(audioMs.toFloat() / generateMs),
         )
-        play(audio.samples, audio.sampleRate)
+        if (text != null) {
+            val heard = kotlinx.coroutines.runBlocking {
+                dev.localassistant.AssistantRuntime.speech.acquire(VoicePack.STT_PARAKEET)
+                    .transcribe(resample(audio.samples, audio.sampleRate), "es")
+            }
+            report("TTSBACK said='$text' heard='$heard'")
+        } else {
+            play(audio.samples, audio.sampleRate)
+        }
         tts.release()
     }
 
@@ -59,6 +71,18 @@ class TtsBench(private val context: Context, private val report: (String) -> Uni
             )
         }
         return OfflineTtsConfig(model = model.apply { numThreads = 2 })
+    }
+
+    private fun resample(samples: FloatArray, from: Int): FloatArray {
+        val to = 16_000
+        val out = FloatArray((samples.size.toLong() * to / from).toInt())
+        for (i in out.indices) {
+            val pos = i.toDouble() * from / to
+            val j = pos.toInt().coerceAtMost(samples.size - 2)
+            val frac = (pos - j).toFloat()
+            out[i] = samples[j] * (1 - frac) + samples[j + 1] * frac
+        }
+        return out
     }
 
     private fun play(samples: FloatArray, sampleRate: Int) {
