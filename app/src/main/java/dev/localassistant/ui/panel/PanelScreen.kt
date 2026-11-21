@@ -31,7 +31,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -254,6 +256,7 @@ private fun toolLabel(activity: ToolActivity): String {
         "search_site" -> R.string.panel_tool_site_search
         "open_link" -> R.string.panel_tool_open_link
         "read_app" -> R.string.panel_tool_read_app
+        "use_app" -> R.string.panel_tool_use_app
         else -> return activity.name
     }
     return stringResource(res, activity.summary)
@@ -265,6 +268,9 @@ private fun PendingActionCard(action: PendingAction, actions: PanelActions) {
     val (icon, title) = when (action.kind) {
         ActionKind.MESSAGE -> Icons.Filled.Email to stringResource(R.string.panel_action_message_title)
         ActionKind.CALENDAR_EVENT -> Icons.Filled.DateRange to stringResource(R.string.panel_action_event_title)
+        ActionKind.SEND -> Icons.AutoMirrored.Filled.Send to stringResource(R.string.panel_action_send_title)
+        ActionKind.DELETE -> Icons.Filled.Delete to stringResource(R.string.panel_action_delete_title)
+        ActionKind.PAY -> Icons.Filled.ShoppingCart to stringResource(R.string.panel_action_pay_title)
     }
     val onContainer = MaterialTheme.colorScheme.onSecondaryContainer
     Surface(

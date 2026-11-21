@@ -153,6 +153,7 @@ class ChatSession(
                 // Whatever the assistant managed to say is kept, including a reply cut short.
                 withContext(NonCancellable) { persist(Role.ASSISTANT, reply) }
                 synchronized(this@ChatSession) { if (turn == myTurn) _generating.value = false }
+                tools?.endTurn()
             }
         }
     }
@@ -186,8 +187,8 @@ class ChatSession(
                 val reader = tools?.available()?.firstOrNull { it.name == READ_APP } ?: return false
                 if (AppReaderService.instance == null) {
                     return say(
-                        if (spanish) "Para leer otras apps, activa «Leer otras apps» en Ajustes, en Permisos." else
-                            "To read other apps, turn on Read other apps in Settings, under Permissions.",
+                        if (spanish) "Para leer otras apps, activa «Leer y usar otras apps» en Ajustes, en Permisos." else
+                            "To read other apps, turn on Read and use other apps in Settings, under Permissions.",
                         listener,
                     )
                 }

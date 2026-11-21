@@ -135,6 +135,8 @@ class AssistantSession(context: Context) :
             if (leavesPanel) mainHandler.post { hide() }
         }
         AssistantRuntime.tools.hidePanel = { mainHandler.post { hide() } }
+        AssistantRuntime.tools.releasePanel = { mainHandler.post { release() } }
+        AssistantRuntime.tools.onPanelShown()
         if (willListen) voice.startListening()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         Log.i(AssistantService.TAG, "Session shown, flags=$showFlags")
@@ -145,13 +147,18 @@ class AssistantSession(context: Context) :
         super.onHide()
         AssistantRuntime.tools.activityStarter = null
         AssistantRuntime.tools.hidePanel = null
-        if (!closedByUser && AssistantRuntime.tools.panelSteppedAside) {
-            // A tool moved the panel out of the way to read the app below; the turn goes on.
-            AssistantRuntime.tools.onPanelHiddenAside()
+        AssistantRuntime.tools.onPanelHidden()
+        if (!closedByUser && AssistantRuntime.tools.panelAway) {
+            // A tool moved the panel out of the way to use the app below; the turn goes on.
             voice.stopListening()
             lifecycleRegistry.currentState = Lifecycle.State.CREATED
             return
         }
+        release()
+    }
+
+    /** Everything closing the panel lets go of, also when a panel moved aside is not coming back. */
+    private fun release() {
         // A message left unconfirmed must not be waiting, armed, the next time the panel opens.
         AssistantRuntime.tools.actions.clear()
         screen.clear()

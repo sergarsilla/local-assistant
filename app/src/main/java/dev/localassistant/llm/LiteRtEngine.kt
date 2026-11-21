@@ -14,6 +14,7 @@ import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.tool
+import dev.localassistant.loggable
 import dev.localassistant.tools.AssistantTool
 import org.json.JSONObject
 import java.io.File
@@ -152,7 +153,9 @@ class LiteRtEngine private constructor(
                             override fun getToolDescriptionJsonString() = assistantTool.describe()
 
                             override fun execute(paramsJsonString: String) =
-                                assistantTool.run(JSONObject(paramsJsonString))
+                                assistantTool.run(JSONObject(paramsJsonString)).also {
+                                    Log.i(TAG, "Tool ${assistantTool.name}(${loggable(paramsJsonString)}) -> ${loggable(it.take(120))}")
+                                }
                         },
                     )
                 },

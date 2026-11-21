@@ -34,10 +34,11 @@ Built and measured on a Pixel 10 running GrapheneOS, with no dependency on Googl
 - **Reads the screen on request.** Only when Android's "use text from screen" is enabled, and only
   when you tap the chip or ask about the screen ("summarise this"). With a vision model, it can
   also look at a screenshot.
-- **Reads other apps when asked.** "What's new on Signal?" or "lee la app de Ajustes y dime cuánto
-  espacio libre tengo" opens that app, reads its text and answers in the panel. It needs an
-  accessibility service you turn on yourself; it only reads, never taps or types, skips password
-  fields, and what it reads goes only to the on-device model.
+- **Reads and uses other apps when asked.** "What's new on Signal?" or "abre ajustes, entra en
+  batería y dime qué porcentaje tengo" opens the app, reads it, taps, types or scrolls step by step,
+  and answers in the panel. A tap that sends, deletes or pays never happens on its own: it waits on
+  a card in the panel until you confirm. It needs an accessibility service you turn on yourself; it
+  acts only when asked, skips password fields, and what it reads goes only to the on-device model.
 - **Keeps history on the phone, if you want.** Conversations are stored in SQLite with
   `secure_delete`; deleting one rewrites the database file so the text is really gone, and saving
   can be turned off. Any conversation can be continued in the assistant.
